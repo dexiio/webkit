@@ -48,7 +48,6 @@
 #include "JSCInlines.h"
 #include "JSLexicalEnvironment.h"
 #include "JSModuleEnvironment.h"
-#include "JSNotAnObject.h"
 #include "JSStackInlines.h"
 #include "JSString.h"
 #include "JSWithScope.h"
@@ -159,8 +158,12 @@ JSValue eval(CallFrame* callFrame)
     JSScope* callerScopeChain = callerFrame->uncheckedR(callerCodeBlock->scopeRegister().offset()).Register::scope();
     UnlinkedCodeBlock* callerUnlinkedCodeBlock = callerCodeBlock->unlinkedCodeBlock();
 
-    bool isArrowFunctionContext = callerUnlinkedCodeBlock->isArrowFunction() || callerUnlinkedCodeBlock->isArrowFunctionContext();
-    EvalExecutable* eval = callerCodeBlock->evalCodeCache().tryGet(callerCodeBlock->isStrictMode(), programSource, isArrowFunctionContext, callerScopeChain);
+    ThisTDZMode thisTDZMode = ThisTDZMode::CheckIfNeeded;
+    if (callerUnlinkedCodeBlock->constructorKind() == ConstructorKind::Derived)
+        thisTDZMode = ThisTDZMode::AlwaysCheck;
+
+    SourceCode sourceCode(makeSource(programSource));
+    EvalExecutable* eval = callerCodeBlock->evalCodeCache().tryGet(callerCodeBlock->isStrictMode(), sourceCode, thisTDZMode, callerScopeChain);
 
     if (!eval) {
         if (!callerCodeBlock->isStrictMode()) {
@@ -177,12 +180,18 @@ JSValue eval(CallFrame* callFrame)
         
         // If the literal parser bailed, it should not have thrown exceptions.
         ASSERT(!callFrame->vm().exception());
+        bool isInArrowFunctionContext = callerCodeBlock->unlinkedCodeBlock()->isArrowFunction() || callerCodeBlock->unlinkedCodeBlock()->isArrowFunctionContext();
 
-        ThisTDZMode thisTDZMode = ThisTDZMode::CheckIfNeeded;
-        if (callerUnlinkedCodeBlock->constructorKind() == ConstructorKind::Derived)
-            thisTDZMode = ThisTDZMode::AlwaysCheck;
+        DerivedContextType derivedContextType = callerCodeBlock->unlinkedCodeBlock()->derivedContextType();
+        
+        if (!isInArrowFunctionContext && callerCodeBlock->unlinkedCodeBlock()->isClassContext()) {
+            derivedContextType = callerCodeBlock->unlinkedCodeBlock()->isConstructor()
+                ? DerivedContextType::DerivedConstructorContext
+                : DerivedContextType::DerivedMethodContext;
+        }
 
-        eval = callerCodeBlock->evalCodeCache().getSlow(callFrame, callerCodeBlock, callerCodeBlock->isStrictMode(), thisTDZMode, callerCodeBlock->unlinkedCodeBlock()->derivedContextType(), callerCodeBlock->unlinkedCodeBlock()->isArrowFunction(), programSource, callerScopeChain);
+        eval = callerCodeBlock->evalCodeCache().getSlow(callFrame, callerCodeBlock, callerCodeBlock->isStrictMode(), thisTDZMode, derivedContextType, isInArrowFunctionContext, sourceCode, callerScopeChain);
+
         if (!eval)
             return jsUndefined();
     }
@@ -216,10 +225,7 @@ unsigned sizeOfVarargs(CallFrame* callFrame, JSValue arguments, uint32_t firstVa
         return 0;
     default:
         ASSERT(arguments.isObject());
-        if (isJSArray(cell))
-            length = jsCast<JSArray*>(cell)->length();
-        else
-            length = jsCast<JSObject*>(cell)->get(callFrame, callFrame->propertyNames().length).toUInt32(callFrame);
+        length = getLength(callFrame, jsCast<JSObject*>(cell));
         break;
     }
     
@@ -890,7 +896,7 @@ JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, J
                     continue;
                 }
                 case JSONPPathEntryTypeLookup: {
-                    baseObject = baseObject.get(callFrame, JSONPPath[i].m_pathIndex);
+                    baseObject = baseObject.get(callFrame, static_cast<unsigned>(JSONPPath[i].m_pathIndex));
                     if (callFrame->hadException())
                         return jsUndefined();
                     continue;
@@ -908,7 +914,7 @@ JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, J
                     return jsUndefined();
                 CallData callData;
                 CallType callType = getCallData(function, callData);
-                if (callType == CallTypeNone)
+                if (callType == CallType::None)
                     return callFrame->vm().throwException(callFrame, createNotAFunctionError(callFrame, function));
                 MarkedArgumentBuffer jsonArg;
                 jsonArg.append(JSONPValue);
@@ -985,7 +991,7 @@ JSValue Interpreter::executeCall(CallFrame* callFrame, JSObject* function, CallT
     if (vm.isCollectorBusy())
         return jsNull();
 
-    bool isJSCall = (callType == CallTypeJS);
+    bool isJSCall = (callType == CallType::JS);
     JSScope* scope = nullptr;
     CodeBlock* newCodeBlock;
     size_t argsCount = 1 + args.size(); // implicit "this" parameter
@@ -996,7 +1002,7 @@ JSValue Interpreter::executeCall(CallFrame* callFrame, JSObject* function, CallT
         scope = callData.js.scope;
         globalObject = scope->globalObject();
     } else {
-        ASSERT(callType == CallTypeHost);
+        ASSERT(callType == CallType::Host);
         globalObject = function->globalObject();
     }
 
@@ -1055,7 +1061,7 @@ JSObject* Interpreter::executeConstruct(CallFrame* callFrame, JSObject* construc
     if (vm.isCollectorBusy())
         return checkedReturn(throwStackOverflowError(callFrame));
 
-    bool isJSConstruct = (constructType == ConstructTypeJS);
+    bool isJSConstruct = (constructType == ConstructType::JS);
     JSScope* scope = nullptr;
     CodeBlock* newCodeBlock;
     size_t argsCount = 1 + args.size(); // implicit "this" parameter
@@ -1066,7 +1072,7 @@ JSObject* Interpreter::executeConstruct(CallFrame* callFrame, JSObject* construc
         scope = constructData.js.scope;
         globalObject = scope->globalObject();
     } else {
-        ASSERT(constructType == ConstructTypeHost);
+        ASSERT(constructType == ConstructType::Host);
         globalObject = constructor->globalObject();
     }
 
@@ -1205,7 +1211,8 @@ JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue
                 variableObject = node;
                 break;
             } 
-            if (JSLexicalEnvironment* lexicalEnvironment = jsDynamicCast<JSLexicalEnvironment*>(node)) {
+            if (node->isJSLexicalEnvironment()) {
+                JSLexicalEnvironment* lexicalEnvironment = jsCast<JSLexicalEnvironment*>(node);
                 if (lexicalEnvironment->symbolTable()->scopeType() == SymbolTable::ScopeType::VarScope) {
                     variableObject = node;
                     break;
