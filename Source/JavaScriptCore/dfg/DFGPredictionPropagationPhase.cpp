@@ -1013,7 +1013,6 @@ private:
     
 bool performPredictionPropagation(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG Prediction Propagation Phase");
     return runPhase<PredictionPropagationPhase>(graph);
 }
 

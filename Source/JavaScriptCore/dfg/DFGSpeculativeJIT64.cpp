@@ -2992,10 +2992,38 @@ void SpeculativeJIT::compile(Node* node)
     }
 
     case RegExpExec: {
-        if (node->child1().useKind() == CellUse
-            && node->child2().useKind() == CellUse) {
-            SpeculateCellOperand base(this, node->child1());
-            SpeculateCellOperand argument(this, node->child2());
+        bool sample = false;
+
+        if (sample)
+            m_jit.incrementSuperSamplerCount();
+        
+        SpeculateCellOperand globalObject(this, node->child1());
+        GPRReg globalObjectGPR = globalObject.gpr();
+        
+        if (node->child2().useKind() == RegExpObjectUse) {
+            if (node->child3().useKind() == StringUse) {
+                SpeculateCellOperand base(this, node->child2());
+                SpeculateCellOperand argument(this, node->child3());
+                GPRReg baseGPR = base.gpr();
+                GPRReg argumentGPR = argument.gpr();
+                speculateRegExpObject(node->child2(), baseGPR);
+                speculateString(node->child3(), argumentGPR);
+                
+                flushRegisters();
+                GPRFlushedCallResult result(this);
+                callOperation(operationRegExpExecString, result.gpr(), globalObjectGPR, baseGPR, argumentGPR);
+                m_jit.exceptionCheck();
+                
+                jsValueResult(result.gpr(), node);
+
+                if (sample)
+                    m_jit.decrementSuperSamplerCount();
+                break;
+            }
+            
+            SpeculateCellOperand base(this, node->child2());
+            JSValueOperand argument(this, node->child3());
+
             GPRReg baseGPR = base.gpr();
             GPRReg argumentGPR = argument.gpr();
         
@@ -3005,6 +3033,9 @@ void SpeculativeJIT::compile(Node* node)
             m_jit.exceptionCheck();
         
             jsValueResult(result.gpr(), node);
+
+            if (sample)
+                m_jit.decrementSuperSamplerCount();
             break;
         }
         
@@ -3019,6 +3050,9 @@ void SpeculativeJIT::compile(Node* node)
         m_jit.exceptionCheck();
         
         jsValueResult(result.gpr(), node);
+
+        if (sample)
+            m_jit.decrementSuperSamplerCount();
         break;
     }
 
@@ -3056,7 +3090,89 @@ void SpeculativeJIT::compile(Node* node)
         jsValueResult(result.gpr(), node, DataFormatJSBoolean);
         break;
     }
+
+    case StringReplace: {
+        bool sample = false;
+
+        if (sample)
+            m_jit.incrementSuperSamplerCount();
         
+        if (node->child1().useKind() == StringUse
+            && node->child2().useKind() == RegExpObjectUse
+            && node->child3().useKind() == StringUse) {
+            if (JSString* replace = node->child3()->dynamicCastConstant<JSString*>()) {
+                if (!replace->length()) {
+                    SpeculateCellOperand string(this, node->child1());
+                    SpeculateCellOperand regExp(this, node->child2());
+                    GPRReg stringGPR = string.gpr();
+                    GPRReg regExpGPR = regExp.gpr();
+                    speculateString(node->child1(), stringGPR);
+                    speculateRegExpObject(node->child2(), regExpGPR);
+
+                    flushRegisters();
+                    GPRFlushedCallResult result(this);
+                    callOperation(
+                        operationStringProtoFuncReplaceRegExpEmptyStr, result.gpr(), stringGPR,
+                        regExpGPR);
+                    m_jit.exceptionCheck();
+                    cellResult(result.gpr(), node);
+                    if (sample)
+                        m_jit.decrementSuperSamplerCount();
+                    break;
+                }
+            }
+            
+            SpeculateCellOperand string(this, node->child1());
+            SpeculateCellOperand regExp(this, node->child2());
+            SpeculateCellOperand replace(this, node->child3());
+            GPRReg stringGPR = string.gpr();
+            GPRReg regExpGPR = regExp.gpr();
+            GPRReg replaceGPR = replace.gpr();
+            speculateString(node->child1(), stringGPR);
+            speculateRegExpObject(node->child2(), regExpGPR);
+            speculateString(node->child3(), replaceGPR);
+            
+            flushRegisters();
+            GPRFlushedCallResult result(this);
+            callOperation(
+                operationStringProtoFuncReplaceRegExpString, result.gpr(), stringGPR, regExpGPR,
+                replaceGPR);
+            m_jit.exceptionCheck();
+            cellResult(result.gpr(), node);
+            if (sample)
+                m_jit.decrementSuperSamplerCount();
+            break;
+        }
+        
+        JSValueOperand string(this, node->child1());
+        JSValueOperand regExp(this, node->child2());
+        JSValueOperand replace(this, node->child3());
+        GPRReg stringGPR = string.gpr();
+        GPRReg regExpGPR = regExp.gpr();
+        GPRReg replaceGPR = replace.gpr();
+        
+        flushRegisters();
+        GPRFlushedCallResult result(this);
+        callOperation(
+            operationStringProtoFuncReplaceGeneric, result.gpr(), stringGPR, regExpGPR,
+            replaceGPR);
+        m_jit.exceptionCheck();
+        cellResult(result.gpr(), node);
+        if (sample)
+            m_jit.decrementSuperSamplerCount();
+        break;
+    }
+        
+    case GetRegExpObjectLastIndex: {
+        compileGetRegExpObjectLastIndex(node);
+        break;
+    }
+        
+    case SetRegExpObjectLastIndex: {
+        compileSetRegExpObjectLastIndex(node);
+        break;
+    }
+
     case ArrayPush: {
         ASSERT(node->arrayMode().isJSArray());
         

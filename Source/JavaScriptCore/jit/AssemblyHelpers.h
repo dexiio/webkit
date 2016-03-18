@@ -38,6 +38,7 @@
 #include "MaxFrameExtentForSlowPathCall.h"
 #include "RegisterAtOffsetList.h"
 #include "RegisterSet.h"
+#include "SuperSampler.h"
 #include "TypeofType.h"
 #include "VM.h"
 
@@ -1025,6 +1026,9 @@ public:
 #endif
 
     void jitReleaseAssertNoException();
+
+    void incrementSuperSamplerCount();
+    void decrementSuperSamplerCount();
     
     void purifyNaN(FPRReg);
 

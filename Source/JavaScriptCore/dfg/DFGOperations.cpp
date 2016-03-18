@@ -52,6 +52,7 @@
 #include "Repatch.h"
 #include "ScopedArguments.h"
 #include "StringConstructor.h"
+#include "SuperSampler.h"
 #include "Symbol.h"
 #include "TypeProfilerLog.h"
 #include "TypedArrayInlines.h"
@@ -614,7 +615,19 @@ EncodedJSValue JIT_OPERATION operationArrayPopAndRecoverLength(ExecState* exec, 
         
 EncodedJSValue JIT_OPERATION operationRegExpExec(ExecState* exec, JSCell* base, JSCell* argument)
 {
-    VM& vm = exec->vm();
+    SuperSamplerScope superSamplerScope(false);
+    
+    VM& vm = globalObject->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+    
+    return JSValue::encode(regExpObject->execInline(exec, globalObject, argument));
+}
+        
+EncodedJSValue JIT_OPERATION operationRegExpExec(ExecState* exec, JSGlobalObject* globalObject, RegExpObject* regExpObject, EncodedJSValue encodedArgument)
+{
+    SuperSamplerScope superSamplerScope(false);
+    
+    VM& vm = globalObject->vm();
     NativeCallFrameTracer tracer(&vm, exec);
     
     if (!base->inherits(RegExpObject::info()))
@@ -633,7 +646,9 @@ EncodedJSValue JIT_OPERATION operationRegExpExec(ExecState* exec, JSCell* base, 
         
 EncodedJSValue JIT_OPERATION operationRegExpExecGeneric(ExecState* exec, EncodedJSValue encodedBase, EncodedJSValue encodedArgument)
 {
-    VM& vm = exec->vm();
+    SuperSamplerScope superSamplerScope(false);
+    
+    VM& vm = globalObject->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
     JSValue base = JSValue::decode(encodedBase);
@@ -650,7 +665,20 @@ EncodedJSValue JIT_OPERATION operationRegExpExecGeneric(ExecState* exec, Encoded
         
 size_t JIT_OPERATION operationRegExpTest(ExecState* exec, JSCell* base, JSCell* argument)
 {
-    VM& vm = exec->vm();
+    SuperSamplerScope superSamplerScope(false);
+    
+    VM& vm = globalObject->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+
+    return regExpObject->testInline(exec, globalObject, input);
+}
+
+size_t JIT_OPERATION operationRegExpTest(ExecState* exec, JSGlobalObject* globalObject, RegExpObject* regExpObject, EncodedJSValue encodedArgument)
+{
+    SuperSamplerScope superSamplerScope(false);
+    
+    VM& vm = globalObject->vm();
+
     NativeCallFrameTracer tracer(&vm, exec);
 
     if (!base->inherits(RegExpObject::info())) {
@@ -671,7 +699,9 @@ size_t JIT_OPERATION operationRegExpTest(ExecState* exec, JSCell* base, JSCell* 
 
 size_t JIT_OPERATION operationRegExpTestGeneric(ExecState* exec, EncodedJSValue encodedBase, EncodedJSValue encodedArgument)
 {
-    VM& vm = exec->vm();
+    SuperSamplerScope superSamplerScope;
+    
+    VM& vm = globalObject->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
     JSValue base = JSValue::decode(encodedBase);

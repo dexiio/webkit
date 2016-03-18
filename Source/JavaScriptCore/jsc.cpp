@@ -49,10 +49,10 @@
 #include "JSWASMModule.h"
 #include "ProfilerDatabase.h"
 #include "SamplingProfiler.h"
-#include "SamplingTool.h"
 #include "StackVisitor.h"
 #include "StructureInlines.h"
 #include "StructureRareDataInlines.h"
+#include "SuperSampler.h"
 #include "TestRunnerUtils.h"
 #include "TypeProfilerLog.h"
 #include "WASMModuleParser.h"
@@ -1834,8 +1834,6 @@ static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scr
             fileName = ASCIILiteral("[Command Line]");
         }
 
-        vm.startSampling();
-
         if (module) {
             if (!promise)
                 promise = loadAndEvaluateModule(globalObject->globalExec(), jscSource(scriptBuffer, fileName));
@@ -1851,20 +1849,9 @@ static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scr
             dumpException(globalObject, evaluationException);
         }
 
-        vm.stopSampling();
         globalObject->globalExec()->clearException();
     }
 
-#if ENABLE(SAMPLING_FLAGS)
-    SamplingFlags::stop();
-#endif
-#if ENABLE(SAMPLING_REGIONS)
-    SamplingRegion::dump();
-#endif
-    vm.dumpSampleData(globalObject->globalExec());
-#if ENABLE(SAMPLING_COUNTERS)
-    AbstractSamplingCounter::dump();
-#endif
 #if ENABLE(REGEXP_TRACING)
     vm.dumpRegExpTrace();
 #endif
@@ -2124,6 +2111,8 @@ int jscmain(int argc, char** argv)
         JSLockHolder locker(vm);
         vm->heap.collectAllGarbage();
     }
+
+    printSuperSamplerState();
 
     return result;
 }

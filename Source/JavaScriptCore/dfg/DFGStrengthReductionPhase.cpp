@@ -346,7 +346,6 @@ private:
     
 bool performStrengthReduction(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG Strength Reduction Phase");
     return runPhase<StrengthReductionPhase>(graph);
 }
 
