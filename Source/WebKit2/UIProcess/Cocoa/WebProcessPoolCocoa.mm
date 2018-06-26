@@ -186,10 +186,6 @@ void WebProcessPool::platformInitializeWebProcess(WebProcessCreationParameters& 
     parameters.shouldEnableFTLJIT = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitJSCFTLJITEnabledDefaultsKey];
     parameters.shouldEnableMemoryPressureReliefLogging = [[NSUserDefaults standardUserDefaults] boolForKey:@"LogMemoryJetsamDetails"];
 
-#if PLATFORM(MAC)
-    parameters.shouldRewriteConstAsVar = applicationIsIBooks();
-#endif
-
 #if HAVE(HOSTED_CORE_ANIMATION)
 #if !PLATFORM(IOS)
     parameters.acceleratedCompositingPort = MachSendRight::create([CARemoteLayerServer sharedServer].serverPort);

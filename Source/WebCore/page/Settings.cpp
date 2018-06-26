@@ -96,7 +96,6 @@ bool Settings::gMockCaptureDevicesEnabled = false;
 bool Settings::gShouldUseHighResolutionTimers = true;
 #endif
     
-bool Settings::gShouldRewriteConstAsVar = false;
 bool Settings::gShouldRespectPriorityInCSSAttributeSetters = false;
 bool Settings::gLowPowerVideoAudioBufferSizeEnabled = false;
 bool Settings::gResourceLoadStatisticsEnabledEnabled = false;
