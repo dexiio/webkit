@@ -114,7 +114,7 @@ public:
     {
     }
 
-    virtual void strokeStyle(GraphicsContext* c) override
+    void strokeStyle(GraphicsContext* c) override
     {
         c->setStrokeThickness(m_canvasContext->lineWidth());
         c->setLineCap(m_canvasContext->getLineCap());
@@ -1638,7 +1638,7 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video, const FloatRec
     checkOrigin(video);
 
 #if USE(CG) || (ENABLE(ACCELERATED_2D_CANVAS) && USE(GSTREAMER_GL) && USE(CAIRO))
-    if (PassNativeImagePtr image = video->nativeImageForCurrentTime()) {
+    if (NativeImagePtr image = video->nativeImageForCurrentTime()) {
         c->drawNativeImage(image, FloatSize(video->videoWidth(), video->videoHeight()), dstRect, srcRect);
         if (rectContainsCanvas(dstRect))
             didDrawEntireCanvas();

@@ -36,7 +36,6 @@
 #include "Timer.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/CString.h>
@@ -151,7 +150,7 @@ namespace WebCore {
 #if ENABLE(NETSCAPE_PLUGIN_API)
         NPObject* npObject();
 #endif
-        virtual RefPtr<JSC::Bindings::Instance> bindingInstance() override;
+        RefPtr<JSC::Bindings::Instance> bindingInstance() override;
 
         PluginStatus status() const { return m_status; }
 
@@ -199,12 +198,12 @@ namespace WebCore {
 #endif
 
         // Widget functions
-        void setFrameRect(const IntRect&) override;
-        void frameRectsChanged() override;
-        void setFocus(bool) override;
-        void show() override;
-        void hide() override;
-        void paint(GraphicsContext&, const IntRect&) override;
+        virtual void setFrameRect(const IntRect&);
+        virtual void frameRectsChanged();
+        virtual void setFocus(bool);
+        virtual void show();
+        virtual void hide();
+        virtual void paint(GraphicsContext&, const IntRect&);
         void clipRectChanged() override;
 
         // This method is used by plugins on all platforms to obtain a clip rect that includes clips set by WebCore,
@@ -340,8 +339,7 @@ namespace WebCore {
 
 #if OS(WINDOWS)
         void paintIntoTransformedContext(HDC);
-        PassRefPtr<Image> snapshot();
-#endif
+        RefPtr<Image> snapshot();
 
         float deviceScaleFactor() const;
 

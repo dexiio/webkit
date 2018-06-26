@@ -31,13 +31,9 @@
 #include "DOMWindow.h"
 #include "DatabaseProvider.h"
 #include "Document.h"
-#include "IDBFactoryImpl.h"
+#include "IDBFactory.h"
 #include "Page.h"
 #include "SecurityOrigin.h"
-
-#if PLATFORM(QT)
-#include "Settings.h"
-#endif
 
 namespace WebCore {
 
@@ -112,16 +108,11 @@ IDBFactory* DOMWindowIndexedDatabase::indexedDB()
     if (!page)
         return nullptr;
 
-#if PLATFORM(QT)
-    if (!page->settings().offlineStorageDatabaseEnabled())
-        return nullptr;
-#endif
-
     if (!m_window->isCurrentlyDisplayedInFrame())
         return nullptr;
 
     if (!m_idbFactory)
-        m_idbFactory = IDBClient::IDBFactory::create(page->idbConnection());
+        m_idbFactory = IDBFactory::create(page->idbConnection());
 
     return m_idbFactory.get();
 }

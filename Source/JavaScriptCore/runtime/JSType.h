@@ -35,7 +35,6 @@ enum JSType : uint8_t {
     StringType,
     SymbolType,
 
-    GetterSetterType,
     CustomGetterSetterType,
     APIValueWrapperType,
 
@@ -75,12 +74,15 @@ enum JSType : uint8_t {
     Float64ArrayType,
     DataViewType,
 
+    GetterSetterType,
     GlobalObjectType,
-    ClosureObjectType,
-
+    LexicalEnvironmentType,
+    GlobalLexicalEnvironmentType,
+    ModuleEnvironmentType,
     RegExpObjectType,
+    ProxyObjectType,
 
-    LastJSCObjectType = RegExpObjectType,
+    LastJSCObjectType = ProxyObjectType,
 };
 
 COMPILE_ASSERT(sizeof(JSType) == sizeof(uint8_t), sizeof_jstype_is_one_byte);

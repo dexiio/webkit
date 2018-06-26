@@ -43,7 +43,7 @@
 #include <wtf/text/TextPosition.h>
 
 #if ENABLE(CSS_GRID_LAYOUT)
-#include "GridCoordinate.h"
+#include "GridArea.h"
 #endif
 
 namespace WebCore {
@@ -210,16 +210,18 @@ public:
 #if ENABLE(CSS_GRID_LAYOUT)
     RefPtr<CSSValue> parseGridPosition();
     bool parseGridItemPositionShorthand(CSSPropertyID, bool important);
-    bool parseGridTemplateRowsAndAreas(PassRefPtr<CSSValue>, bool important);
+    RefPtr<CSSValue> parseGridTemplateColumns();
+    bool parseGridTemplateRowsAndAreasAndColumns(bool important);
     bool parseGridTemplateShorthand(bool important);
     bool parseGridShorthand(bool important);
     bool parseGridAreaShorthand(bool important);
     bool parseGridGapShorthand(bool important);
     bool parseSingleGridAreaLonghand(RefPtr<CSSValue>&);
     RefPtr<CSSValue> parseGridTrackList();
-    bool parseGridTrackRepeatFunction(CSSValueList&);
-    RefPtr<CSSValue> parseGridTrackSize(CSSParserValueList& inputList);
-    RefPtr<CSSPrimitiveValue> parseGridBreadth(CSSParserValue&);
+    bool parseGridTrackRepeatFunction(CSSValueList&, bool& isAutoRepeat);
+    enum TrackSizeRestriction { FixedSizeOnly, AllowAll };
+    RefPtr<CSSValue> parseGridTrackSize(CSSParserValueList& inputList, TrackSizeRestriction = AllowAll);
+    RefPtr<CSSPrimitiveValue> parseGridBreadth(CSSParserValue&, TrackSizeRestriction = AllowAll);
     bool parseGridTemplateAreasRow(NamedGridAreaMap&, const unsigned, unsigned&);
     RefPtr<CSSValue> parseGridTemplateAreas();
     bool parseGridLineNames(CSSParserValueList&, CSSValueList&, CSSGridLineNamesValue* = nullptr);

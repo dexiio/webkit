@@ -39,15 +39,16 @@
 namespace WebCore {
 
 class IDBCursorInfo;
+class IDBDatabase;
 class IDBError;
 class IDBObjectStoreInfo;
+class IDBOpenDBRequest;
 class IDBResultData;
+class IDBTransaction;
+class IDBValue;
 
 namespace IDBClient {
 
-class IDBDatabase;
-class IDBOpenDBRequest;
-class IDBTransaction;
 class TransactionOperation;
 
 class IDBConnectionToServer : public RefCounted<IDBConnectionToServer> {
@@ -77,7 +78,7 @@ public:
     void deleteIndex(TransactionOperation&, uint64_t objectStoreIdentifier, const String& indexName);
     WEBCORE_EXPORT void didDeleteIndex(const IDBResultData&);
 
-    void putOrAdd(TransactionOperation&, RefPtr<IDBKey>&, RefPtr<SerializedScriptValue>&, const IndexedDB::ObjectStoreOverwriteMode);
+    void putOrAdd(TransactionOperation&, IDBKey*, const IDBValue&, const IndexedDB::ObjectStoreOverwriteMode);
     WEBCORE_EXPORT void didPutOrAdd(const IDBResultData&);
 
     void getRecord(TransactionOperation&, const IDBKeyRangeData&);
@@ -130,7 +131,7 @@ private:
 
     Ref<IDBConnectionToServerDelegate> m_delegate;
 
-    HashMap<IDBResourceIdentifier, RefPtr<IDBClient::IDBOpenDBRequest>> m_openDBRequestMap;
+    HashMap<IDBResourceIdentifier, RefPtr<IDBOpenDBRequest>> m_openDBRequestMap;
     HashMap<uint64_t, IDBDatabase*> m_databaseConnectionMap;
     HashMap<IDBResourceIdentifier, RefPtr<IDBTransaction>> m_pendingTransactions;
     HashMap<IDBResourceIdentifier, RefPtr<IDBTransaction>> m_committingTransactions;

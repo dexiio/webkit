@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2003, 2007, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2007, 2009, 2016 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -46,6 +46,7 @@
     macro(GamepadButton) \
     macro(GamepadEvent) \
     macro(GeneratorFunction) \
+    macro(Headers) \
     macro(HTMLAudioElement) \
     macro(HTMLSlotElement) \
     macro(IDBCursor) \
@@ -76,6 +77,8 @@
     macro(ReferenceError) \
     macro(Reflect) \
     macro(RegExp) \
+    macro(Response) \
+    macro(Request) \
     macro(Set)\
     macro(SetIterator)\
     macro(ShadowRoot) \
@@ -87,6 +90,8 @@
     macro(UTC) \
     macro(WeakMap)\
     macro(WeakSet)\
+    macro(WebGL2RenderingContext) \
+    macro(WebGLVertexArrayObject) \
     macro(WebSocket) \
     macro(__defineGetter__) \
     macro(__defineSetter__) \
@@ -138,6 +143,7 @@
     macro(exec) \
     macro(executionCount) \
     macro(exitKind) \
+    macro(fetch) \
     macro(flags) \
     macro(focus) \
     macro(forEach) \
@@ -218,6 +224,7 @@
     macro(sourceCode) \
     macro(sourceURL) \
     macro(stack) \
+    macro(sticky) \
     macro(subarray) \
     macro(target) \
     macro(test) \
@@ -232,6 +239,7 @@
     macro(toPrecision) \
     macro(toString) \
     macro(top) \
+    macro(unicode) \
     macro(usage) \
     macro(value) \
     macro(valueOf) \
@@ -301,16 +309,16 @@
 
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL_NOT_IMPLEMENTED_YET(macro)\
     macro(isConcatSpreadable) \
-    macro(match) \
     macro(replace) \
-    macro(split) \
-    macro(toPrimitive)
+    macro(split)
 
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL(macro) \
     macro(hasInstance) \
     macro(iterator) \
+    macro(match) \
     macro(search) \
     macro(species) \
+    macro(toPrimitive) \
     macro(toStringTag) \
     macro(unscopables)
 
@@ -338,17 +346,25 @@
     macro(RegExp) \
     macro(Map) \
     macro(Promise) \
+    macro(Reflect) \
     macro(InternalPromise) \
     macro(abs) \
     macro(floor) \
+    macro(trunc) \
     macro(isFinite) \
     macro(isNaN) \
+    macro(create) \
+    macro(defineProperty) \
     macro(getPrototypeOf) \
+    macro(getOwnPropertyDescriptor) \
     macro(getOwnPropertyNames) \
+    macro(ownKeys) \
+    macro(Error) \
     macro(RangeError) \
     macro(TypeError) \
     macro(typedArrayLength) \
     macro(typedArraySort) \
+    macro(typedArrayGetOriginalConstructor) \
     macro(BuiltinLog) \
     macro(homeObject) \
     macro(getTemplateObject) \
@@ -359,6 +375,7 @@
     macro(promiseRejectReactions) \
     macro(promiseResult) \
     macro(push) \
+    macro(repeatCharacter) \
     macro(capabilities) \
     macro(starDefault) \
     macro(InspectorInstrumentation) \
@@ -375,6 +392,7 @@
     macro(Uint32Array) \
     macro(Float32Array) \
     macro(Float64Array) \
+    macro(exec) \
     macro(generator) \
     macro(generatorNext) \
     macro(generatorState) \
@@ -385,14 +403,18 @@
     macro(Collator) \
     macro(DateTimeFormat) \
     macro(NumberFormat) \
+    macro(intlSubstituteValue) \
     macro(thisTimeValue) \
     macro(newTargetLocal) \
     macro(derivedConstructor) \
     macro(isBoundFunction) \
     macro(hasInstanceBoundFunction) \
     macro(instanceOf) \
+    macro(isArray) \
+    macro(isArrayConstructor) \
     macro(isSet) \
     macro(isMap) \
+    macro(regExpCreate) \
     macro(SetIterator) \
     macro(setIteratorNext) \
     macro(MapIterator) \

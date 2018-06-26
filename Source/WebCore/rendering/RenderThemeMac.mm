@@ -351,13 +351,22 @@ void RenderThemeMac::updateCachedSystemFontDescription(CSSValueID cssValueId, Fo
             fontName = AtomicString("-apple-status-bar", AtomicString::ConstructFromLiteral);
             break;
         case CSSValueWebkitMiniControl:
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSMiniControlSize]];
+#pragma clang diagnostic pop
             break;
         case CSSValueWebkitSmallControl:
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSSmallControlSize]];
+#pragma clang diagnostic pop
             break;
         case CSSValueWebkitControl:
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSRegularControlSize]];
+#pragma clang diagnostic pop
             break;
         default:
             font = [NSFont systemFontOfSize:[NSFont systemFontSize]];
@@ -740,15 +749,20 @@ bool RenderThemeMac::controlSupportsTints(const RenderObject& o) const
 NSControlSize RenderThemeMac::controlSizeForFont(const RenderStyle& style) const
 {
     int fontSize = style.fontSize();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     if (fontSize >= 16)
         return NSRegularControlSize;
     if (fontSize >= 11)
         return NSSmallControlSize;
     return NSMiniControlSize;
+#pragma clang diagnostic pop
 }
 
 NSControlSize RenderThemeMac::controlSizeForCell(NSCell*, const IntSize* sizes, const IntSize& minSize, float zoomLevel) const
 {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     if (minSize.width() >= static_cast<int>(sizes[NSRegularControlSize].width() * zoomLevel)
         && minSize.height() >= static_cast<int>(sizes[NSRegularControlSize].height() * zoomLevel))
         return NSRegularControlSize;
@@ -758,6 +772,7 @@ NSControlSize RenderThemeMac::controlSizeForCell(NSCell*, const IntSize* sizes, 
         return NSSmallControlSize;
 
     return NSMiniControlSize;
+#pragma clang diagnostic pop
 }
 
 void RenderThemeMac::setControlSize(NSCell* cell, const IntSize* sizes, const IntSize& minSize, float zoomLevel)
@@ -814,12 +829,15 @@ void RenderThemeMac::setFontFromControlSize(StyleResolver&, RenderStyle& style, 
 
 NSControlSize RenderThemeMac::controlSizeForSystemFont(const RenderStyle& style) const
 {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     int fontSize = style.fontSize();
     if (fontSize >= [NSFont systemFontSizeForControlSize:NSRegularControlSize])
         return NSRegularControlSize;
     if (fontSize >= [NSFont systemFontSizeForControlSize:NSSmallControlSize])
         return NSSmallControlSize;
     return NSMiniControlSize;
+#pragma clang diagnostic pop
 }
 
 bool RenderThemeMac::paintTextField(const RenderObject& o, const PaintInfo& paintInfo, const FloatRect& r)
@@ -1095,7 +1113,10 @@ bool RenderThemeMac::paintProgressBar(const RenderObject& renderObject, const Pa
     const auto& renderProgress = downcast<RenderProgress>(renderObject);
     HIThemeTrackDrawInfo trackInfo;
     trackInfo.version = 0;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     if (controlSize == NSRegularControlSize)
+#pragma clang diagnostic pop
         trackInfo.kind = renderProgress.position() < 0 ? kThemeLargeIndeterminateBar : kThemeLargeProgressBar;
     else
         trackInfo.kind = renderProgress.position() < 0 ? kThemeMediumIndeterminateBar : kThemeMediumProgressBar;
@@ -1368,12 +1389,15 @@ PopupMenuStyle::PopupMenuSize RenderThemeMac::popupMenuSize(const RenderStyle& s
     NSPopUpButtonCell* popupButton = this->popupButton();
     NSControlSize size = controlSizeForCell(popupButton, popupButtonSizes(), rect.size(), style.effectiveZoom());
     switch (size) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     case NSRegularControlSize:
         return PopupMenuStyle::PopupMenuSizeNormal;
     case NSSmallControlSize:
         return PopupMenuStyle::PopupMenuSizeSmall;
     case NSMiniControlSize:
         return PopupMenuStyle::PopupMenuSizeMini;
+#pragma clang diagnostic pop
     default:
         return PopupMenuStyle::PopupMenuSizeNormal;
     }
@@ -1639,6 +1663,19 @@ void RenderThemeMac::adjustSearchFieldStyle(StyleResolver& styleResolver, Render
 
 bool RenderThemeMac::paintSearchFieldCancelButton(const RenderBox& box, const PaintInfo& paintInfo, const IntRect& r)
 {
+    auto adjustedCancelButtonRect = [this, &box] (const FloatRect& localBoundsForCancelButton) -> FloatRect
+    {
+        IntSize cancelButtonSizeBasedOnFontSize = sizeForSystemFont(box.style(), cancelButtonSizes());
+        FloatSize diff = localBoundsForCancelButton.size() - FloatSize(cancelButtonSizeBasedOnFontSize);
+        if (!diff.width() && !diff.height())
+            return localBoundsForCancelButton;
+        // Vertically centered and right aligned.
+        FloatRect adjustedLocalBoundsForCancelButton = localBoundsForCancelButton;
+        adjustedLocalBoundsForCancelButton.move(diff.width(), floorToDevicePixel(diff.height() / 2, box.document().deviceScaleFactor()));
+        adjustedLocalBoundsForCancelButton.setSize(cancelButtonSizeBasedOnFontSize);
+        return adjustedLocalBoundsForCancelButton;
+    };
+
     if (!box.element())
         return false;
     Element* input = box.element()->shadowHost();
@@ -1663,7 +1700,7 @@ bool RenderThemeMac::paintSearchFieldCancelButton(const RenderBox& box, const Pa
 
     float zoomLevel = box.style().effectiveZoom();
 
-    FloatRect localBounds = [search cancelButtonRectForBounds:NSRect(snappedIntRect(inputBox.contentBoxRect()))];
+    FloatRect localBounds = adjustedCancelButtonRect([search cancelButtonRectForBounds:NSRect(snappedIntRect(inputBox.contentBoxRect()))]);
     FloatPoint paintingPos = convertToPaintingPosition(inputBox, box, localBounds.location(), r.location());
 
     FloatRect unzoomedRect(paintingPos, localBounds.size());
@@ -1674,7 +1711,6 @@ bool RenderThemeMac::paintSearchFieldCancelButton(const RenderBox& box, const Pa
         paintInfo.context().scale(FloatSize(zoomLevel, zoomLevel));
         paintInfo.context().translate(-unzoomedRect.x(), -unzoomedRect.y());
     }
-
     [[search cancelButtonCell] drawWithFrame:unzoomedRect inView:documentViewFor(box)];
     [[search cancelButtonCell] setControlView:nil];
     return false;
@@ -1682,7 +1718,7 @@ bool RenderThemeMac::paintSearchFieldCancelButton(const RenderBox& box, const Pa
 
 const IntSize* RenderThemeMac::cancelButtonSizes() const
 {
-    static const IntSize sizes[3] = { IntSize(16, 13), IntSize(13, 11), IntSize(13, 9) };
+    static const IntSize sizes[3] = { IntSize(22, 22), IntSize(19, 19), IntSize(15, 15) };
     return sizes;
 }
 
@@ -1694,9 +1730,10 @@ void RenderThemeMac::adjustSearchFieldCancelButtonStyle(StyleResolver&, RenderSt
     style.setBoxShadow(nullptr);
 }
 
+const int resultsArrowWidth = 5;
 const IntSize* RenderThemeMac::resultsButtonSizes() const
 {
-    static const IntSize sizes[3] = { IntSize(19, 13), IntSize(17, 11), IntSize(17, 9) };
+    static const IntSize sizes[3] = { IntSize(19, 22), IntSize(17, 19), IntSize(17, 15) };
     return sizes;
 }
 
@@ -1750,7 +1787,6 @@ bool RenderThemeMac::paintSearchFieldResultsDecorationPart(const RenderBox& box,
     return false;
 }
 
-const int resultsArrowWidth = 5;
 void RenderThemeMac::adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderStyle& style, Element*) const
 {
     IntSize size = sizeForSystemFont(style, resultsButtonSizes());
@@ -1761,6 +1797,20 @@ void RenderThemeMac::adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderS
 
 bool RenderThemeMac::paintSearchFieldResultsButton(const RenderBox& box, const PaintInfo& paintInfo, const IntRect& r)
 {
+    auto adjustedResultButtonRect = [this, &box] (const FloatRect& localBounds) -> FloatRect
+    {
+        IntSize buttonSize = sizeForSystemFont(box.style(), resultsButtonSizes());
+        buttonSize.expand(resultsArrowWidth, 0);
+        FloatSize diff = localBounds.size() - FloatSize(buttonSize);
+        if (!diff.isZero())
+            return localBounds;
+        // Vertically centered and left aligned.
+        FloatRect adjustedLocalBounds = localBounds;
+        adjustedLocalBounds.move(0, floorToDevicePixel(diff.height() / 2, box.document().deviceScaleFactor()));
+        adjustedLocalBounds.setSize(buttonSize);
+        return adjustedLocalBounds;
+    };
+
     Element* input = box.element()->shadowHost();
     if (!input)
         input = box.element();
@@ -1779,7 +1829,7 @@ bool RenderThemeMac::paintSearchFieldResultsButton(const RenderBox& box, const P
     GraphicsContextStateSaver stateSaver(paintInfo.context());
     float zoomLevel = box.style().effectiveZoom();
 
-    FloatRect localBounds = [search searchButtonRectForBounds:NSRect(snappedIntRect(inputBox.contentBoxRect()))];
+    FloatRect localBounds = adjustedResultButtonRect([search searchButtonRectForBounds:NSRect(snappedIntRect(inputBox.contentBoxRect()))]);
     FloatPoint paintingPos = convertToPaintingPosition(inputBox, box, localBounds.location(), r.location());
     
     FloatRect unzoomedRect(paintingPos, localBounds.size());
@@ -1943,9 +1993,12 @@ NSSliderCell* RenderThemeMac::sliderThumbHorizontal() const
 {
     if (!m_sliderThumbHorizontal) {
         m_sliderThumbHorizontal = adoptNS([[NSSliderCell alloc] init]);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         [m_sliderThumbHorizontal.get() setSliderType:NSLinearSlider];
         [m_sliderThumbHorizontal.get() setControlSize:NSSmallControlSize];
         [m_sliderThumbHorizontal.get() setFocusRingType:NSFocusRingTypeExterior];
+#pragma clang diagnostic pop
     }
 
     return m_sliderThumbHorizontal.get();
@@ -1955,8 +2008,11 @@ NSSliderCell* RenderThemeMac::sliderThumbVertical() const
 {
     if (!m_sliderThumbVertical) {
         m_sliderThumbVertical = adoptNS([[NSSliderCell alloc] init]);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         [m_sliderThumbVertical.get() setSliderType:NSLinearSlider];
         [m_sliderThumbVertical.get() setControlSize:NSSmallControlSize];
+#pragma clang diagnostic pop
         [m_sliderThumbVertical.get() setFocusRingType:NSFocusRingTypeExterior];
     }
 
@@ -2317,7 +2373,7 @@ static RefPtr<Icon> iconForAttachment(const RenderAttachment& attachment)
 {
     String MIMEType = attachment.attachmentElement().attachmentType();
     if (!MIMEType.isEmpty()) {
-        if (equalIgnoringASCIICase(MIMEType, "multipart/x-folder")) {
+        if (equalIgnoringASCIICase(MIMEType, "multipart/x-folder") || equalIgnoringASCIICase(MIMEType, "application/vnd.apple.folder")) {
             if (auto icon = Icon::createIconForUTI("public.directory"))
                 return icon;
         } else if (auto icon = Icon::createIconForMIMEType(MIMEType))

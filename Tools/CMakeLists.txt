@@ -1,4 +1,4 @@
-WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
+set_property(DIRECTORY . PROPERTY FOLDER "Tools")
 
 if ("${PORT}" STREQUAL "Efl")
     if (DEVELOPER_MODE)
@@ -30,12 +30,15 @@ elseif ("${PORT}" STREQUAL "GTK")
 endif ()
 
 if (WIN32)
-    #add_subdirectory(DumpRenderTree)
-    # TODO: Enable when Qt port ready
-    if (NOT "${PORT}" STREQUAL "Qt")
-        add_subdirectory(TestWebKitAPI)
-        add_subdirectory(MiniBrowser/win)
-    endif ()
+    add_subdirectory(DumpRenderTree)
+    add_subdirectory(TestWebKitAPI)
+    add_subdirectory(MiniBrowser/win)
+endif ()
+
+if (APPLE)
+    add_subdirectory(DumpRenderTree)
+    add_subdirectory(WebKitTestRunner)
+    add_subdirectory(MiniBrowser/mac)
 endif ()
 
 if (ENABLE_WEBKIT2 AND ENABLE_API_TESTS)

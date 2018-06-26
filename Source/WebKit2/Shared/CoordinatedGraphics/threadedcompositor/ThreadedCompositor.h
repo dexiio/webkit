@@ -44,10 +44,10 @@ struct CoordinatedGraphicsState;
 }
 
 namespace WebKit {
-class CoordinatedGraphicsScene;
-class CoordinatedGraphicsSceneClient;
 
 class CompositingRunLoop;
+class CoordinatedGraphicsScene;
+class CoordinatedGraphicsSceneClient;
 
 class ThreadedCompositor : public SimpleViewportController::Client, public CoordinatedGraphicsSceneClient, public ThreadSafeRefCounted<ThreadedCompositor> {
     WTF_MAKE_NONCOPYABLE(ThreadedCompositor);
@@ -81,20 +81,20 @@ private:
     ThreadedCompositor(Client*);
 
     // CoordinatedGraphicsSceneClient
-    virtual void purgeBackingStores() override;
-    virtual void renderNextFrame() override;
-    virtual void updateViewport() override;
-    virtual void commitScrollOffset(uint32_t layerID, const WebCore::IntSize& offset) override;
+    void purgeBackingStores() override;
+    void renderNextFrame() override;
+    void updateViewport() override;
+    void commitScrollOffset(uint32_t layerID, const WebCore::IntSize& offset) override;
 
     void renderLayerTree();
     void scheduleDisplayImmediately();
-    virtual void didChangeVisibleRect() override;
+    void didChangeVisibleRect() override;
 
     bool ensureGLContext();
     WebCore::GLContext* glContext();
     SimpleViewportController* viewportController() { return m_viewportController.get(); }
 
-    void callOnCompositingThread(std::function<void()>);
+    void callOnCompositingThread(std::function<void()>&&);
     void createCompositingThread();
     void runCompositingThread();
     void terminateCompositingThread();

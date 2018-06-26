@@ -38,6 +38,7 @@
 #include "HTMLHtmlElement.h"
 #include "HTMLNames.h"
 #include "FlowThreadController.h"
+#include "PathUtilities.h"
 #include "RenderBlock.h"
 #include "RenderCounter.h"
 #include "RenderDeprecatedFlexibleBox.h"
@@ -94,7 +95,7 @@ inline RenderElement::RenderElement(ContainerNode& elementOrDocument, Ref<Render
     , m_hasContinuation(false)
     , m_renderBlockHasMarginBeforeQuirk(false)
     , m_renderBlockHasMarginAfterQuirk(false)
-    , m_renderBlockHasBorderOrPaddingLogicalWidthChanged(false)
+    , m_renderBlockShouldForceRelayoutChildren(false)
     , m_renderBlockFlowHasMarkupTruncation(false)
     , m_renderBlockFlowLineLayoutPath(RenderBlockFlow::UndeterminedPath)
     , m_firstChild(nullptr)
@@ -160,6 +161,7 @@ RenderPtr<RenderElement> RenderElement::createFor(Element& element, Ref<RenderSt
 
     switch (style.get().display()) {
     case NONE:
+    case CONTENTS:
         return nullptr;
     case INLINE:
         return createRenderer<RenderInline>(element, WTFMove(style));
@@ -1576,9 +1578,9 @@ PassRefPtr<RenderStyle> RenderElement::getUncachedPseudoStyle(const PseudoStyleR
     auto& styleResolver = element()->styleResolver();
 
     if (pseudoStyleRequest.pseudoId == FIRST_LINE_INHERITED) {
-        RefPtr<RenderStyle> result = styleResolver.styleForElement(*element(), parentStyle);
+        auto result = styleResolver.styleForElement(*element(), parentStyle).renderStyle;
         result->setStyleType(FIRST_LINE_INHERITED);
-        return result.release();
+        return WTFMove(result);
     }
 
     return styleResolver.pseudoStyleForElement(*element(), pseudoStyleRequest, *parentStyle);
@@ -2038,19 +2040,28 @@ void RenderElement::drawLineForBoxSide(GraphicsContext& graphicsContext, const F
     }
 }
 
-void RenderElement::paintFocusRing(PaintInfo& paintInfo, const LayoutPoint& paintOffset, const RenderStyle& style)
+void RenderElement::paintFocusRing(PaintInfo& paintInfo, const RenderStyle& style, const Vector<LayoutRect>& focusRingRects)
 {
     ASSERT(style.outlineStyleIsAuto());
-
-    Vector<LayoutRect> focusRingRects;
-    addFocusRingRects(focusRingRects, paintOffset, paintInfo.paintContainer);
+    float outlineOffset = style.outlineOffset();
     Vector<FloatRect> pixelSnappedFocusRingRects;
     float deviceScaleFactor = document().deviceScaleFactor();
-    for (const auto& rect : focusRingRects)
+    for (auto rect : focusRingRects) {
+        rect.inflate(outlineOffset);
         pixelSnappedFocusRingRects.append(snapRectToDevicePixels(rect, deviceScaleFactor));
+    }
 #if PLATFORM(MAC)
     bool needsRepaint;
-    paintInfo.context().drawFocusRing(pixelSnappedFocusRingRects, style.outlineOffset(), document().page()->focusController().timeSinceFocusWasSet(), needsRepaint);
+    if (style.hasBorderRadius()) {
+        Path path = PathUtilities::pathWithShrinkWrappedRectsForOutline(pixelSnappedFocusRingRects, style.border(), outlineOffset, style.direction(), style.writingMode(),
+            document().deviceScaleFactor());
+        if (path.isEmpty()) {
+            for (auto rect : pixelSnappedFocusRingRects)
+                path.addRect(rect);
+        }
+        paintInfo.context().drawFocusRing(path, document().page()->focusController().timeSinceFocusWasSet(), needsRepaint);
+    } else
+        paintInfo.context().drawFocusRing(pixelSnappedFocusRingRects, document().page()->focusController().timeSinceFocusWasSet(), needsRepaint);
     if (needsRepaint)
         document().page()->focusController().setFocusedElementNeedsRepaint();
 #else
@@ -2072,8 +2083,11 @@ void RenderElement::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRe
     float outlineOffset = floorToDevicePixel(styleToUse.outlineOffset(), document().deviceScaleFactor());
 
     // Only paint the focus ring by hand if the theme isn't able to draw it.
-    if (styleToUse.outlineStyleIsAuto() && !theme().supportsFocusRing(styleToUse))
-        paintFocusRing(paintInfo, paintRect.location(), styleToUse);
+    if (styleToUse.outlineStyleIsAuto() && !theme().supportsFocusRing(styleToUse)) {
+        Vector<LayoutRect> focusRingRects;
+        addFocusRingRects(focusRingRects, paintRect.location(), paintInfo.paintContainer);
+        paintFocusRing(paintInfo, styleToUse, focusRingRects);
+    }
 
     if (hasOutlineAnnotation() && !styleToUse.outlineStyleIsAuto() && !theme().supportsFocusRing(styleToUse))
         addPDFURLRect(paintInfo, paintRect.location());

@@ -99,7 +99,7 @@ public:
     {
     }
 
-    virtual std::unique_ptr<AnimationValue> clone() const override
+    std::unique_ptr<AnimationValue> clone() const override
     {
         return std::make_unique<FloatAnimationValue>(*this);
     }
@@ -126,7 +126,7 @@ public:
     {
     }
 
-    virtual std::unique_ptr<AnimationValue> clone() const override
+    std::unique_ptr<AnimationValue> clone() const override
     {
         return std::make_unique<TransformAnimationValue>(*this);
     }
@@ -154,7 +154,7 @@ public:
     {
     }
 
-    virtual std::unique_ptr<AnimationValue> clone() const override
+    std::unique_ptr<AnimationValue> clone() const override
     {
         return std::make_unique<FilterAnimationValue>(*this);
     }
@@ -666,7 +666,7 @@ SPECIALIZE_TYPE_TRAITS_BEGIN(ToValueTypeName) \
     static bool isType(const WebCore::GraphicsLayer& layer) { return layer.predicate; } \
 SPECIALIZE_TYPE_TRAITS_END()
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 // Outside the WebCore namespace for ease of invocation from gdb.
 void showGraphicsLayerTree(const WebCore::GraphicsLayer* layer);
 #endif

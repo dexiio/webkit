@@ -79,6 +79,8 @@ public:
     void setTrailingWhitespaceWidth(float collapsedWhitespace, float borderPaddingMargin = 0);
     IndentTextOrNot shouldIndentText() const { return m_shouldIndentText; }
 
+    bool isFirstLine() const { return m_isFirstLine; }
+
 private:
     void computeAvailableWidthFromLeftAndRight();
     bool fitsOnLineExcludingTrailingCollapsedWhitespace() const;

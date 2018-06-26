@@ -138,6 +138,7 @@ public:
         ProcessPoolConfiguration,
         PluginSiteDataManager,
         Preferences,
+        ResourceLoadStatisticsStore,
         RunBeforeUnloadConfirmPanelResultListener,
         RunJavaScriptAlertResultListener,
         RunJavaScriptConfirmResultListener,
@@ -148,6 +149,7 @@ public:
         UserContentController,
         UserContentExtension,
         UserContentExtensionStore,
+        UserContentWorld,
         UserMediaPermissionCheck,
         UserMediaPermissionRequest,
         Vibration,
@@ -253,7 +255,7 @@ protected:
     {
     }
 
-    virtual Type type() const override { return APIType; }
+    Type type() const override { return APIType; }
 
 #if DELEGATE_REF_COUNTING_TO_COCOA
     void* operator new(size_t size) { return newObject(size, APIType); }

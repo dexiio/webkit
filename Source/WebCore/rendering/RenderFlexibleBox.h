@@ -42,28 +42,28 @@ public:
     RenderFlexibleBox(Document&, Ref<RenderStyle>&&);
     virtual ~RenderFlexibleBox();
 
-    virtual const char* renderName() const override;
+    const char* renderName() const override;
 
-    virtual bool avoidsFloats() const override final { return true; }
-    virtual bool canDropAnonymousBlockChild() const override final { return false; }
-    virtual void layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight = 0) override final;
+    bool avoidsFloats() const final { return true; }
+    bool canDropAnonymousBlockChild() const final { return false; }
+    void layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight = 0) override;
 
-    virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const override;
-    virtual Optional<int> firstLineBaseline() const override;
-    virtual Optional<int> inlineBlockBaseline(LineDirectionMode) const override;
+    int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const override;
+    Optional<int> firstLineBaseline() const override;
+    Optional<int> inlineBlockBaseline(LineDirectionMode) const override;
 
-    virtual void paintChildren(PaintInfo& forSelf, const LayoutPoint&, PaintInfo& forChild, bool usePrintRect) override;
+    void paintChildren(PaintInfo& forSelf, const LayoutPoint&, PaintInfo& forChild, bool usePrintRect) override;
 
     bool isHorizontalFlow() const;
 
-    virtual bool isTopLayoutOverflowAllowed() const override;
-    virtual bool isLeftLayoutOverflowAllowed() const override;
+    bool isTopLayoutOverflowAllowed() const override;
+    bool isLeftLayoutOverflowAllowed() const override;
 
 protected:
-    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const override;
-    virtual void computePreferredLogicalWidths() override;
+    void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const override;
+    void computePreferredLogicalWidths() override;
 
-    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
+    void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
 
 private:
     enum FlexSign {
@@ -86,7 +86,7 @@ private:
     typedef Vector<LayoutRect, 8> ChildFrameRects;
 
     bool isFlexibleBox() const final { return true; }
-    bool hasOrthogonalFlow(const RenderBox& child) const;
+    bool hasOrthogonalFlow(RenderBox& child) const;
     bool isColumnFlow() const;
     bool isLeftToRightFlow() const;
     bool isMultiline() const;
@@ -163,7 +163,7 @@ private:
     bool crossAxisLengthIsDefinite(const RenderBox&, const Length&) const;
     bool useChildAspectRatio(const RenderBox&) const;
     Optional<LayoutUnit> computeMainSizeFromAspectRatioUsing(const RenderBox& child, Length crossSizeLength) const;
-    
+
     virtual bool isFlexibleBoxImpl() const { return false; };
 
     mutable OrderIterator m_orderIterator;

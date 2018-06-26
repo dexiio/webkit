@@ -99,7 +99,6 @@ MediaPlayerPrivateMediaFoundation::MediaPlayerPrivateMediaFoundation(MediaPlayer
     , m_hasVideo(false)
     , m_preparingToPlay(false)
     , m_hwndVideo(nullptr)
-    , m_volume(1.0)
     , m_networkState(MediaPlayer::Empty)
     , m_readyState(MediaPlayer::HaveNothing)
     , m_weakPtrFactory(this)
@@ -307,27 +306,16 @@ bool MediaPlayerPrivateMediaFoundation::paused() const
     return m_paused;
 }
 
-bool MediaPlayerPrivateMediaFoundation::setAllChannelVolumes(float volume)
-{
-    if (!MFGetServicePtr())
-        return false;
-
-    COMPtr<IMFAudioStreamVolume> audioVolume;
-    if (!SUCCEEDED(MFGetServicePtr()(m_mediaSession.get(), MR_STREAM_VOLUME_SERVICE, __uuidof(IMFAudioStreamVolume), (void **)&audioVolume)))
-        return false;
-
-    UINT32 channelsCount;
-    HRESULT hr = audioVolume->GetChannelCount(&channelsCount);
-    ASSERT(SUCCEEDED(hr));
-
-    Vector<float> volumes(channelsCount, volume);
-    return SUCCEEDED(audioVolume->SetAllVolumes(channelsCount, volumes.data()));
-}
-
 void MediaPlayerPrivateMediaFoundation::setVolume(float volume)
 {
-    if (setAllChannelVolumes(volume))
-        m_volume = volume;
+    if (!MFGetServicePtr())
+        return;
+
+    COMPtr<IMFSimpleAudioVolume> audioVolume;
+    if (SUCCEEDED(MFGetServicePtr()(m_mediaSession.get(), MR_POLICY_VOLUME_SERVICE, __uuidof(IMFSimpleAudioVolume), (void **)&audioVolume))) {
+        HRESULT hr = audioVolume->SetMasterVolume(volume);
+        ASSERT(SUCCEEDED(hr));
+    }
 }
 
 bool MediaPlayerPrivateMediaFoundation::supportsMuting() const
@@ -337,7 +325,14 @@ bool MediaPlayerPrivateMediaFoundation::supportsMuting() const
 
 void MediaPlayerPrivateMediaFoundation::setMuted(bool muted)
 {
-    setAllChannelVolumes(muted ? 0.0 : m_volume);
+    if (!MFGetServicePtr())
+        return;
+
+    COMPtr<IMFSimpleAudioVolume> audioVolume;
+    if (SUCCEEDED(MFGetServicePtr()(m_mediaSession.get(), MR_POLICY_VOLUME_SERVICE, __uuidof(IMFSimpleAudioVolume), (void **)&audioVolume))) {
+        HRESULT hr = audioVolume->SetMute(muted ? TRUE : FALSE);
+        ASSERT(SUCCEEDED(hr));
+    }
 }
 
 MediaPlayer::NetworkState MediaPlayerPrivateMediaFoundation::networkState() const
@@ -538,16 +533,6 @@ bool MediaPlayerPrivateMediaFoundation::endGetEvent(IMFAsyncResult* asyncResult)
             if (!weakPtr)
                 return;
             weakPtr->onTopologySet();
-        });
-        break;
-    }
-
-    case MESessionStarted: {
-        auto weakPtr = m_weakPtrFactory.createWeakPtr();
-        callOnMainThread([weakPtr] {
-            if (!weakPtr)
-                return;
-            weakPtr->onSessionStarted();
         });
         break;
     }
@@ -946,11 +931,6 @@ void MediaPlayerPrivateMediaFoundation::onBufferingStarted()
 }
 
 void MediaPlayerPrivateMediaFoundation::onBufferingStopped()
-{
-    updateReadyState();
-}
-
-void MediaPlayerPrivateMediaFoundation::onSessionStarted()
 {
     updateReadyState();
 }

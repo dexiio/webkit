@@ -2,7 +2,7 @@
 // disabled for Qt
 function assert(b) {
     if (!b)
-        throw new Error("Bad assertion.");
+        throw new Error("Bad assertion");
 }
 
 {
@@ -147,7 +147,7 @@ function assert(b) {
         try {
             "x" in proxy;
         } catch(e) {
-            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties.");
+            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties");
             threw = true;
         }
         assert(threw);
@@ -169,7 +169,7 @@ function assert(b) {
         try {
             "x" in proxy;
         } catch(e) {
-            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties.");
+            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties");
             threw = true;
         }
         assert(threw);
@@ -191,7 +191,7 @@ function assert(b) {
         try {
             "x" in proxy;
         } catch(e) {
-            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties.");
+            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties");
             threw = true;
         }
         assert(threw);
@@ -213,7 +213,7 @@ function assert(b) {
         try {
             "x" in proxy;
         } catch(e) {
-            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties.");
+            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties");
             threw = true;
         }
         assert(threw);
@@ -235,7 +235,7 @@ function assert(b) {
         try {
             "x" in proxy;
         } catch(e) {
-            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties.");
+            assert(e.toString() === "TypeError: Proxy 'has' must return 'true' for non-configurable properties");
             threw = true;
         }
         assert(threw);
@@ -367,5 +367,101 @@ function assert(b) {
             threw = true;
         }
         assert(threw);
+    }
+}
+
+{
+    let e1 = null;
+    let e2 = null;
+    let t1 = {};
+    let called1 = false;
+    let h1 = {
+        has: function(theTarget, propName) {
+            called1 = true;
+            e1 = new Error;
+            throw e1;
+            return false;
+        }
+    };
+    let p1 = new Proxy(t1, h1);
+
+    let t2 = {};
+    t2.__proto__ = p1;
+    let h2 = {
+        has: function(theTarget, propName) {
+            e2 = new Error;
+            throw e2;
+            return false;
+        }
+    };
+    let p2 = new Proxy(t2, h2);
+    for (let i = 0; i < 500; i++) {
+        let threw = false;
+        try {
+            10 in p2;
+        } catch(e) {
+            assert(e === e2);
+            threw = true;
+        }
+        assert(threw);
+        assert(!called1);
+    }
+}
+
+{
+    let e1 = null;
+    let e2 = null;
+    let t1 = {};
+    let called1 = false;
+    let h1 = {
+        has: function(theTarget, propName) {
+            called1 = true;
+            e1 = new Error;
+            throw e1;
+            return false;
+        }
+    };
+    let p1 = new Proxy(t1, h1);
+
+    let t2 = {};
+    t2.__proto__ = p1;
+    let h2 = {
+        has: function(theTarget, propName) {
+            e2 = new Error;
+            throw e2;
+            return false;
+        }
+    };
+    let p2 = new Proxy(t2, h2);
+    for (let i = 0; i < 500; i++) {
+        let threw = false;
+        try {
+            "foo" in p2;
+        } catch(e) {
+            assert(e === e2);
+            threw = true;
+        }
+        assert(threw);
+        assert(!called1);
+    }
+}
+
+{
+    let called = false;
+    let handler = {
+        has: function(...args) {
+            called = true;
+            return Reflect.has(...args);
+        }
+    };
+    let proxy = new Proxy({}, handler);
+    let foo = function() {
+        assert(!Reflect.has(proxy, "x"));
+        assert(called);
+        called = false;
+    }
+    noInline(foo)
+    for (let i = 0; i < 10000; i++) {
+        foo();
     }
 }

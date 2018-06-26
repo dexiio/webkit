@@ -44,6 +44,7 @@ inline CapabilityLevel canCompile(Node* node)
     
     switch (node->op()) {
     case JSConstant:
+    case LazyJSConstant:
     case GetLocal:
     case SetLocal:
     case PutStack:
@@ -68,7 +69,6 @@ inline CapabilityLevel canCompile(Node* node)
     case ArrayifyToStructure:
     case PutStructure:
     case GetButterfly:
-    case GetButterflyReadOnly:
     case NewObject:
     case NewArray:
     case NewArrayBuffer:
@@ -99,6 +99,7 @@ inline CapabilityLevel canCompile(Node* node)
     case ArithRound:
     case ArithFloor:
     case ArithCeil:
+    case ArithTrunc:
     case ArithSqrt:
     case ArithLog:
     case ArithFRound:
@@ -111,8 +112,8 @@ inline CapabilityLevel canCompile(Node* node)
     case ExtractOSREntryLocal:
     case LoopHint:
     case SkipScope:
+    case GetGlobalObject:
     case CreateActivation:
-    case NewArrowFunction:
     case NewFunction:
     case NewGeneratorFunction:
     case GetClosureVar:
@@ -164,6 +165,7 @@ inline CapabilityLevel canCompile(Node* node)
     case CallStringConstructor:
     case MakeRope:
     case NewArrayWithSize:
+    case TryGetById:
     case GetById:
     case GetByIdFlush:
     case ToThis:
@@ -224,6 +226,12 @@ inline CapabilityLevel canCompile(Node* node)
     case RegExpTest:
     case NewRegexp:
     case StringReplace:
+    case GetRegExpObjectLastIndex:
+    case SetRegExpObjectLastIndex:
+    case RecordRegExpCachedResult:
+    case SetFunctionName:
+    case LogShadowChickenPrologue:
+    case LogShadowChickenTail:
         // These are OK.
         break;
 

@@ -137,6 +137,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case JSConstant:
     case DoubleConstant:
     case Int52Constant:
+    case LazyJSConstant:
     case Identity:
     case ToThis:
     case CreateThis:
@@ -185,10 +186,12 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ArithRound:
     case ArithFloor:
     case ArithCeil:
+    case ArithTrunc:
     case ArithSin:
     case ArithCos:
     case ArithLog:
     case ValueAdd:
+    case TryGetById:
     case GetById:
     case GetByIdFlush:
     case PutById:
@@ -202,12 +205,12 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CheckStructure:
     case GetExecutable:
     case GetButterfly:
-    case GetButterflyReadOnly:
     case CheckArray:
     case Arrayify:
     case ArrayifyToStructure:
     case GetScope:
     case SkipScope:
+    case GetGlobalObject:
     case GetClosureVar:
     case PutClosureVar:
     case GetGlobalVar:
@@ -241,7 +244,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case NewArrayWithSize:
     case NewArrayBuffer:
     case NewRegexp:
-    case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
     case ProfileType:
@@ -261,6 +263,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case LogicalNot:
     case ToPrimitive:
     case ToString:
+    case SetFunctionName:
     case StrCat:
     case CallStringConstructor:
     case NewStringObject:
@@ -272,7 +275,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CreateClonedArguments:
     case GetFromArguments:
     case PutToArguments:
-    case NewArrowFunction:
     case NewFunction:
     case NewGeneratorFunction:
     case Jump:
@@ -287,6 +289,8 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CountExecution:
     case ForceOSRExit:
     case CheckWatchdogTimer:
+    case LogShadowChickenPrologue:
+    case LogShadowChickenTail:
     case StringFromCharCode:
     case NewTypedArray:
     case Unreachable:
@@ -294,7 +298,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CheckTierUpInLoop:
     case CheckTierUpAtReturn:
     case CheckTierUpAndOSREnter:
-    case CheckTierUpWithNestedTriggerAndOSREnter:
     case LoopHint:
     case StoreBarrier:
     case InvalidationPoint:
@@ -333,6 +336,9 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ForwardVarargs:
     case CopyRest:
     case StringReplace:
+    case GetRegExpObjectLastIndex:
+    case SetRegExpObjectLastIndex:
+    case RecordRegExpCachedResult:
         return true;
 
     case BottomValue:

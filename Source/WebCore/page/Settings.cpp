@@ -77,11 +77,12 @@ static void invalidateAfterGenericFamilyChange(Page* page)
 
 #if USE(AVFOUNDATION)
 bool Settings::gAVFoundationEnabled = true;
-bool Settings::gAVFoundationNSURLSessionEnabled = false;
+bool Settings::gAVFoundationNSURLSessionEnabled = true;
 #endif
 
 #if PLATFORM(COCOA)
 bool Settings::gQTKitEnabled = false;
+bool Settings::gCookieStoragePartitioningEnabled = false;
 #endif
 
 bool Settings::gMockScrollbarsEnabled = false;
@@ -96,7 +97,6 @@ bool Settings::gMockCaptureDevicesEnabled = false;
 bool Settings::gShouldUseHighResolutionTimers = true;
 #endif
     
-bool Settings::gShouldRewriteConstAsVar = false;
 bool Settings::gShouldRespectPriorityInCSSAttributeSetters = false;
 bool Settings::gLowPowerVideoAudioBufferSizeEnabled = false;
 bool Settings::gResourceLoadStatisticsEnabledEnabled = false;
@@ -137,7 +137,7 @@ static const bool defaultFixedBackgroundsPaintRelativeToDocument = true;
 static const bool defaultAcceleratedCompositingForFixedPositionEnabled = true;
 static const bool defaultAllowsInlineMediaPlayback = false;
 static const bool defaultInlineMediaPlaybackRequiresPlaysInlineAttribute = true;
-static const bool defaultRequiresUserGestureForMediaPlayback = true;
+static const bool defaultVideoPlaybackRequiresUserGesture = true;
 static const bool defaultAudioPlaybackRequiresUserGesture = true;
 static const bool defaultMediaDataLoadsAutomatically = false;
 static const bool defaultShouldRespectImageOrientation = true;
@@ -150,7 +150,7 @@ static const bool defaultFixedBackgroundsPaintRelativeToDocument = false;
 static const bool defaultAcceleratedCompositingForFixedPositionEnabled = false;
 static const bool defaultAllowsInlineMediaPlayback = true;
 static const bool defaultInlineMediaPlaybackRequiresPlaysInlineAttribute = false;
-static const bool defaultRequiresUserGestureForMediaPlayback = false;
+static const bool defaultVideoPlaybackRequiresUserGesture = false;
 static const bool defaultAudioPlaybackRequiresUserGesture = false;
 static const bool defaultMediaDataLoadsAutomatically = true;
 static const bool defaultShouldRespectImageOrientation = false;
@@ -201,7 +201,6 @@ Settings::Settings(Page* page)
     , m_needsAdobeFrameReloadingQuirk(false)
     , m_usesPageCache(false)
     , m_fontRenderingMode(0)
-    , m_antialiasedFontDilationEnabled(false)
     , m_showTiledScrollingIndicator(false)
     , m_backgroundShouldExtendBeyondPage(false)
     , m_dnsPrefetchingEnabled(false)
@@ -211,9 +210,7 @@ Settings::Settings(Page* page)
     , m_scrollingPerformanceLoggingEnabled(false)
     , m_timeWithoutMouseMovementBeforeHidingControls(3)
     , m_setImageLoadingSettingsTimer(*this, &Settings::imageLoadingSettingsTimerFired)
-#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
     , m_hiddenPageDOMTimerThrottlingEnabled(false)
-#endif
     , m_hiddenPageCSSAnimationSuspensionEnabled(false)
     , m_fontFallbackPrefersPictographs(false)
     , m_forcePendingWebGLPolicy(false)
@@ -364,12 +361,6 @@ void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
 
 #endif
 
-void Settings::setAntialiasedFontDilationEnabled(bool enabled)
-{
-    // FIXME: It's wrong for a setting to toggle a global, but this code is temporary.
-    FontCascade::setAntialiasedFontDilationEnabled(enabled);
-}
-
 void Settings::setMediaTypeOverride(const String& mediaTypeOverride)
 {
     if (m_mediaTypeOverride == mediaTypeOverride)
@@ -472,9 +463,9 @@ void Settings::setNeedsAdobeFrameReloadingQuirk(bool shouldNotReloadIFramesForUn
     m_needsAdobeFrameReloadingQuirk = shouldNotReloadIFramesForUnchangedSRC;
 }
 
-void Settings::setMinimumDOMTimerInterval(double interval)
+void Settings::setMinimumDOMTimerInterval(std::chrono::milliseconds interval)
 {
-    double oldTimerInterval = m_minimumDOMTimerInterval;
+    auto oldTimerInterval = m_minimumDOMTimerInterval;
     m_minimumDOMTimerInterval = interval;
 
     if (!m_page)
@@ -607,6 +598,11 @@ void Settings::setQTKitEnabled(bool enabled)
     gQTKitEnabled = enabled;
     HTMLMediaElement::resetMediaEngines();
 }
+    
+void Settings::setCookieStoragePartitioningEnabled(bool enabled)
+{
+    gCookieStoragePartitioningEnabled = enabled;
+}
 #endif
 
 #if ENABLE(MEDIA_STREAM)
@@ -672,7 +668,6 @@ bool Settings::shouldRespectPriorityInCSSAttributeSetters()
     return gShouldRespectPriorityInCSSAttributeSetters;
 }
 
-#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
 void Settings::setHiddenPageDOMTimerThrottlingEnabled(bool flag)
 {
     if (m_hiddenPageDOMTimerThrottlingEnabled == flag)
@@ -681,7 +676,15 @@ void Settings::setHiddenPageDOMTimerThrottlingEnabled(bool flag)
     if (m_page)
         m_page->hiddenPageDOMTimerThrottlingStateChanged();
 }
-#endif
+
+void Settings::setHiddenPageDOMTimerThrottlingAutoIncreases(bool flag)
+{
+    if (m_hiddenPageDOMTimerThrottlingAutoIncreases == flag)
+        return;
+    m_hiddenPageDOMTimerThrottlingAutoIncreases = flag;
+    if (m_page)
+        m_page->hiddenPageDOMTimerThrottlingStateChanged();
+}
 
 void Settings::setHiddenPageCSSAnimationSuspensionEnabled(bool flag)
 {

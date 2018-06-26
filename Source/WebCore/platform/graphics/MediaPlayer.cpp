@@ -69,7 +69,9 @@
 #endif
 
 #if PLATFORM(COCOA)
+#if USE(QTKIT)
 #include "MediaPlayerPrivateQTKit.h"
+#endif
 
 #if USE(AVFOUNDATION)
 #include "MediaPlayerPrivateAVFoundationObjC.h"
@@ -177,13 +179,13 @@ struct MediaPlayerFactory {
     CreateMediaEnginePlayer constructor;
     MediaEngineSupportedTypes getSupportedTypes;
     MediaEngineSupportsType supportsTypeAndCodecs;
-    MediaEngineGetSitesInMediaCache getSitesInMediaCache;
+    MediaEngineOriginsInMediaCache originsInMediaCache;
     MediaEngineClearMediaCache clearMediaCache;
-    MediaEngineClearMediaCacheForSite clearMediaCacheForSite;
+    MediaEngineClearMediaCacheForOrigins clearMediaCacheForOrigins;
     MediaEngineSupportsKeySystem supportsKeySystem;
 };
 
-static void addMediaEngine(CreateMediaEnginePlayer, MediaEngineSupportedTypes, MediaEngineSupportsType, MediaEngineGetSitesInMediaCache, MediaEngineClearMediaCache, MediaEngineClearMediaCacheForSite, MediaEngineSupportsKeySystem);
+static void addMediaEngine(CreateMediaEnginePlayer, MediaEngineSupportedTypes, MediaEngineSupportsType, MediaEngineOriginsInMediaCache, MediaEngineClearMediaCache, MediaEngineClearMediaCacheForOrigins, MediaEngineSupportsKeySystem);
 
 static bool haveMediaEnginesVector;
 
@@ -216,7 +218,7 @@ static void buildMediaEnginesVector()
     }
 #endif // USE(AVFOUNDATION)
 
-#if PLATFORM(MAC)
+#if PLATFORM(MAC) && USE(QTKIT)
     if (Settings::isQTKitEnabled())
         MediaPlayerPrivateQTKit::registerMediaEngine(addMediaEngine);
 #endif
@@ -241,13 +243,13 @@ static const Vector<MediaPlayerFactory>& installedMediaEngines()
 }
 
 static void addMediaEngine(CreateMediaEnginePlayer constructor, MediaEngineSupportedTypes getSupportedTypes, MediaEngineSupportsType supportsType,
-    MediaEngineGetSitesInMediaCache getSitesInMediaCache, MediaEngineClearMediaCache clearMediaCache, MediaEngineClearMediaCacheForSite clearMediaCacheForSite, MediaEngineSupportsKeySystem supportsKeySystem)
+    MediaEngineOriginsInMediaCache originsInMediaCache, MediaEngineClearMediaCache clearMediaCache, MediaEngineClearMediaCacheForOrigins clearMediaCacheForOrigins, MediaEngineSupportsKeySystem supportsKeySystem)
 {
     ASSERT(constructor);
     ASSERT(getSupportedTypes);
     ASSERT(supportsType);
 
-    mutableInstalledMediaEnginesVector().append(MediaPlayerFactory { constructor, getSupportedTypes, supportsType, getSitesInMediaCache, clearMediaCache, clearMediaCacheForSite, supportsKeySystem });
+    mutableInstalledMediaEnginesVector().append(MediaPlayerFactory { constructor, getSupportedTypes, supportsType, originsInMediaCache, clearMediaCache, clearMediaCacheForOrigins, supportsKeySystem });
 }
 
 static const AtomicString& applicationOctetStream()
@@ -335,6 +337,7 @@ MediaPlayer::MediaPlayer(MediaPlayerClient& client)
 
 MediaPlayer::~MediaPlayer()
 {
+    ASSERT(!m_initializingMediaEngine);
 }
 
 bool MediaPlayer::load(const URL& url, const ContentType& contentType, const String& keySystem)
@@ -441,6 +444,9 @@ void MediaPlayer::loadWithNextMediaEngine(const MediaPlayerFactory* current)
 #define MEDIASTREAM 0
 #endif
 
+    ASSERT(!m_initializingMediaEngine);
+    m_initializingMediaEngine = true;
+
     const MediaPlayerFactory* engine = nullptr;
 
     if (!m_contentMIMEType.isEmpty() || MEDIASTREAM || MEDIASOURCE)
@@ -483,6 +489,8 @@ void MediaPlayer::loadWithNextMediaEngine(const MediaPlayerFactory* current)
         m_client.mediaPlayerEngineUpdated(this);
         m_client.mediaPlayerResourceNotSupported(this);
     }
+
+    m_initializingMediaEngine = false;
 }
 
 bool MediaPlayer::hasAvailableVideoFrame() const
@@ -846,7 +854,7 @@ bool MediaPlayer::copyVideoTextureToPlatformTexture(GraphicsContext3D* context, 
     return m_private->copyVideoTextureToPlatformTexture(context, texture, target, level, internalFormat, format, type, premultiplyAlpha, flipY);
 }
 
-PassNativeImagePtr MediaPlayer::nativeImageForCurrentTime()
+NativeImagePtr MediaPlayer::nativeImageForCurrentTime()
 {
     return m_private->nativeImageForCurrentTime();
 }
@@ -1043,30 +1051,39 @@ void MediaPlayer::reloadTimerFired()
     loadWithNextMediaEngine(m_currentMediaEngine);
 }
 
-void MediaPlayer::getSitesInMediaCache(Vector<String>& sites)
+template<typename T>
+static void addToHash(HashSet<T>& toHash, HashSet<T>&& fromHash)
 {
+    if (toHash.isEmpty())
+        toHash = WTFMove(fromHash);
+    else
+        toHash.add(fromHash.begin(), fromHash.end());
+}
+    
+HashSet<RefPtr<SecurityOrigin>> MediaPlayer::originsInMediaCache(const String& path)
+{
+    HashSet<RefPtr<SecurityOrigin>> origins;
     for (auto& engine : installedMediaEngines()) {
-        if (!engine.getSitesInMediaCache)
+        if (!engine.originsInMediaCache)
             continue;
-        Vector<String> engineSites;
-        engine.getSitesInMediaCache(engineSites);
-        sites.appendVector(engineSites);
+        addToHash(origins, engine.originsInMediaCache(path));
     }
+    return origins;
 }
 
-void MediaPlayer::clearMediaCache()
+void MediaPlayer::clearMediaCache(const String& path, std::chrono::system_clock::time_point modifiedSince)
 {
     for (auto& engine : installedMediaEngines()) {
         if (engine.clearMediaCache)
-            engine.clearMediaCache();
+            engine.clearMediaCache(path, modifiedSince);
     }
 }
 
-void MediaPlayer::clearMediaCacheForSite(const String& site)
+void MediaPlayer::clearMediaCacheForOrigins(const String& path, const HashSet<RefPtr<SecurityOrigin>>& origins)
 {
     for (auto& engine : installedMediaEngines()) {
-        if (engine.clearMediaCacheForSite)
-            engine.clearMediaCacheForSite(site);
+        if (engine.clearMediaCacheForOrigins)
+            engine.clearMediaCacheForOrigins(path, origins);
     }
 }
 

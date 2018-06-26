@@ -78,6 +78,18 @@
     _session->setSessionIdentifier(sessionIdentifier);
 }
 
+- (BOOL)isPaired
+{
+    return _session->isPaired();
+}
+
+#if PLATFORM(MAC)
+- (BOOL)wasEventSynthesizedForAutomation:(NSEvent *)event
+{
+    return _session->wasEventSynthesizedForAutomation(event);
+}
+#endif
+
 #pragma mark WKObject protocol implementation
 
 - (API::Object&)_apiObject

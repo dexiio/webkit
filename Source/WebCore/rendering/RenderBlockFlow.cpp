@@ -655,7 +655,7 @@ void RenderBlockFlow::layoutBlockChild(RenderBox& child, MarginInfo& marginInfo,
     LayoutUnit oldNegMarginBefore = maxNegativeMarginBefore();
 
     // The child is a normal flow object. Compute the margins we will use for collapsing now.
-    child.computeAndSetBlockDirectionMargins(this);
+    child.computeAndSetBlockDirectionMargins(*this);
 
     // Try to guess our correct logical top position. In most cases this guess will
     // be correct. Only if we're wrong (when we compute the real logical top position)
@@ -828,8 +828,8 @@ LayoutUnit RenderBlockFlow::marginOffsetForSelfCollapsingBlock()
 void RenderBlockFlow::determineLogicalLeftPositionForChild(RenderBox& child, ApplyLayoutDeltaMode applyDelta)
 {
     LayoutUnit startPosition = borderStart() + paddingStart();
-    if (style().shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
-        startPosition -= verticalScrollbarWidth();
+    if (style().shouldPlaceBlockDirectionScrollbarOnLeft())
+        startPosition += (style().isLeftToRightDirection() ? 1 : -1) * verticalScrollbarWidth();
     LayoutUnit totalAvailableLogicalWidth = borderAndPaddingLogicalWidth() + availableLogicalWidth();
 
     // Add in our start margin.
@@ -1235,7 +1235,7 @@ void RenderBlockFlow::marginBeforeEstimateForChild(RenderBox& child, LayoutUnit&
 
     // Make sure to update the block margins now for the grandchild box so that we're looking at current values.
     if (grandchildBox->needsLayout()) {
-        grandchildBox->computeAndSetBlockDirectionMargins(this);
+        grandchildBox->computeAndSetBlockDirectionMargins(*this);
         if (is<RenderBlock>(*grandchildBox)) {
             RenderBlock& grandchildBlock = downcast<RenderBlock>(*grandchildBox);
             grandchildBlock.setHasMarginBeforeQuirk(grandchildBox->style().hasMarginBeforeQuirk());
@@ -2286,7 +2286,7 @@ FloatingObject* RenderBlockFlow::insertFloatingObject(RenderBox& floatBox)
     }
     else {
         floatBox.updateLogicalWidth();
-        floatBox.computeAndSetBlockDirectionMargins(this);
+        floatBox.computeAndSetBlockDirectionMargins(*this);
     }
 
     setLogicalWidthForFloat(*floatingObject, logicalWidthForChild(floatBox) + marginStartForChild(floatBox) + marginEndForChild(floatBox));
@@ -4030,7 +4030,7 @@ static inline void stripTrailingSpace(float& inlineMax, float& inlineMin, Render
         RenderText& renderText = downcast<RenderText>(*trailingSpaceChild);
         const UChar space = ' ';
         const FontCascade& font = renderText.style().fontCascade(); // FIXME: This ignores first-line.
-        float spaceWidth = font.width(RenderBlock::constructTextRun(&renderText, font, &space, 1, renderText.style()));
+        float spaceWidth = font.width(RenderBlock::constructTextRun(&space, 1, renderText.style()));
         inlineMax -= spaceWidth + font.wordSpacing();
         if (inlineMin > inlineMax)
             inlineMin = inlineMax;
@@ -4074,6 +4074,12 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
     RenderObject* prevFloat = 0;
     bool isPrevChildInlineFlow = false;
     bool shouldBreakLineAfterText = false;
+    bool canHangPunctuationAtStart = styleToUse.hangingPunctuation() & FirstHangingPunctuation;
+    bool canHangPunctuationAtEnd = styleToUse.hangingPunctuation() & LastHangingPunctuation;
+    RenderText* lastText = nullptr;
+
+    bool addedStartPunctuationHang = false;
+    
     while (RenderObject* child = childIterator.next()) {
         bool autoWrap = child->isReplaced() ? child->parent()->style().autoWrap() :
             child->style().autoWrap();
@@ -4118,6 +4124,7 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
             float childMax = 0;
 
             if (!child->isText()) {
+                lastText = nullptr;
                 if (child->isLineBreakOpportunity()) {
                     minLogicalWidth = preferredWidth(minLogicalWidth, inlineMin);
                     inlineMin = 0;
@@ -4189,6 +4196,9 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
                     else
                         addedTextIndent = true;
                 }
+                
+                if (canHangPunctuationAtStart && !addedStartPunctuationHang && !child->isFloating() && !isAnonymousInlineBlock)
+                    addedStartPunctuationHang = true;
 
                 // Add our width to the max.
                 inlineMax += std::max<float>(0, childMax);
@@ -4221,6 +4231,7 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
                 if (!child->isFloating()) {
                     stripFrontSpaces = false;
                     trailingSpaceChild = nullptr;
+                    lastText = nullptr;
                 }
             } else if (is<RenderText>(*child)) {
                 // Case (3). Text.
@@ -4238,6 +4249,7 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
                 float beginMin, endMin;
                 bool beginWS, endWS;
                 float beginMax, endMax;
+                bool strippingBeginWS = stripFrontSpaces;
                 renderText.trimmedPrefWidths(inlineMax, beginMin, beginWS, endMin, endWS,
                                      hasBreakableChar, hasBreak, beginMax, endMax,
                                      childMin, childMax, stripFrontSpaces);
@@ -4250,6 +4262,8 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
                     }
                     continue;
                 }
+                
+                lastText = &renderText;
 
                 if (stripFrontSpaces)
                     trailingSpaceChild = child;
@@ -4277,7 +4291,18 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
                         hasRemainingNegativeTextIndent = true;
                     }
                 }
-
+                
+                // See if we have a hanging punctuation situation at the start.
+                if (canHangPunctuationAtStart && !addedStartPunctuationHang) {
+                    unsigned startIndex = strippingBeginWS ? renderText.firstCharacterIndexStrippingSpaces() : 0;
+                    float hangStartWidth = renderText.hangablePunctuationStartWidth(startIndex);
+                    childMin -= hangStartWidth;
+                    beginMin -= hangStartWidth;
+                    childMax -= hangStartWidth;
+                    beginMax -= hangStartWidth;
+                    addedStartPunctuationHang = true;
+                }
+                
                 // If we have no breakable characters at all,
                 // then this is the easy case. We add ourselves to the current
                 // min and max and continue.
@@ -4315,6 +4340,7 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
                     maxLogicalWidth = preferredWidth(maxLogicalWidth, childMax);
                     inlineMax = endMax;
                     addedTextIndent = true;
+                    addedStartPunctuationHang = true;
                 } else
                     inlineMax += std::max<float>(0, childMax);
             }
@@ -4329,6 +4355,7 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
             stripFrontSpaces = true;
             trailingSpaceChild = 0;
             addedTextIndent = true;
+            addedStartPunctuationHang = true;
         }
 
         if (!child->isText() && child->isRenderInline())
@@ -4341,6 +4368,13 @@ void RenderBlockFlow::computeInlinePreferredLogicalWidths(LayoutUnit& minLogical
 
     if (styleToUse.collapseWhiteSpace())
         stripTrailingSpace(inlineMax, inlineMin, trailingSpaceChild);
+    
+    if (canHangPunctuationAtEnd && lastText && lastText->textLength() > 0) {
+        unsigned endIndex = trailingSpaceChild == lastText ? lastText->lastCharacterIndexStrippingSpaces() : lastText->textLength() - 1;
+        float endHangWidth = lastText->hangablePunctuationEndWidth(endIndex);
+        inlineMin -= endHangWidth;
+        inlineMax -= endHangWidth;
+    }
 
     minLogicalWidth = preferredWidth(minLogicalWidth, inlineMin);
     maxLogicalWidth = preferredWidth(maxLogicalWidth, inlineMax);

@@ -140,7 +140,8 @@ private:
                 node->setArithMode(Arith::CheckOverflow);
             else {
                 node->setArithMode(Arith::DoOverflow);
-                node->setResult(NodeResultDouble);
+                node->clearFlags(NodeMustGenerate);
+                node->setResult(enableInt52() ? NodeResultInt52 : NodeResultDouble);
             }
             break;
         }
@@ -282,7 +283,7 @@ private:
                 break;
             }
             if (m_graph.binaryArithShouldSpeculateInt32(node, FixupPass)) {
-                if (optimizeForX86() || optimizeForARM64() || optimizeForARMv7IDIVSupported() || optimizeForMIPS()) {
+                if (optimizeForX86() || optimizeForARM64() || optimizeForARMv7IDIVSupported()) {
                     fixIntOrBooleanEdge(leftChild);
                     fixIntOrBooleanEdge(rightChild);
                     if (bytecodeCanTruncateInteger(node->arithNodeFlags()))
@@ -365,7 +366,8 @@ private:
 
         case ArithRound:
         case ArithFloor:
-        case ArithCeil: {
+        case ArithCeil:
+        case ArithTrunc: {
             if (m_graph.unaryArithShouldSpeculateInt32(node, FixupPass)) {
                 fixIntOrBooleanEdge(node->child1());
                 insertCheck<Int32Use>(m_indexInBlock, node->child1().node());
@@ -881,13 +883,13 @@ private:
             
         case RegExpExec:
         case RegExpTest: {
-            // FIXME: These should probably speculate something stronger than cell.
-            // https://bugs.webkit.org/show_bug.cgi?id=154900
-            if (node->child1()->shouldSpeculateCell()
-                && node->child2()->shouldSpeculateCell()) {
-                fixEdge<CellUse>(node->child1());
-                fixEdge<CellUse>(node->child2());
-                break;
+            fixEdge<KnownCellUse>(node->child1());
+            
+            if (node->child2()->shouldSpeculateRegExpObject()) {
+                fixEdge<RegExpObjectUse>(node->child2());
+
+                if (node->child3()->shouldSpeculateString())
+                    fixEdge<StringUse>(node->child3());
             }
             break;
         }
@@ -1055,7 +1057,8 @@ private:
         case SkipScope:
         case GetScope:
         case GetGetter:
-        case GetSetter: {
+        case GetSetter:
+        case GetGlobalObject: {
             fixEdge<KnownCellUse>(node->child1());
             break;
         }
@@ -1063,6 +1066,12 @@ private:
         case AllocatePropertyStorage:
         case ReallocatePropertyStorage: {
             fixEdge<KnownCellUse>(node->child1());
+            break;
+        }
+
+        case TryGetById: {
+            if (node->child1()->shouldSpeculateCell())
+                fixEdge<CellUse>(node->child1());
             break;
         }
 
@@ -1076,9 +1085,19 @@ private:
                 && !m_graph.hasExitSite(node->origin.semantic, BadCache)
                 && !m_graph.hasExitSite(node->origin.semantic, BadIndexingType)
                 && !m_graph.hasExitSite(node->origin.semantic, ExoticObjectMode)) {
+                
                 auto uid = m_graph.identifiers()[node->identifierNumber()];
+                
                 if (uid == vm().propertyNames->length.impl()) {
                     attemptToMakeGetArrayLength(node);
+                    break;
+                }
+
+                if (uid == vm().propertyNames->lastIndex.impl()
+                    && node->child1()->shouldSpeculateRegExpObject()) {
+                    node->setOp(GetRegExpObjectLastIndex);
+                    node->clearFlags(NodeMustGenerate);
+                    fixEdge<RegExpObjectUse>(node->child1());
                     break;
                 }
             }
@@ -1091,6 +1110,23 @@ private:
         case PutById:
         case PutByIdFlush:
         case PutByIdDirect: {
+            if (node->child1()->shouldSpeculateCellOrOther()
+                && !m_graph.hasExitSite(node->origin.semantic, BadType)
+                && !m_graph.hasExitSite(node->origin.semantic, BadCache)
+                && !m_graph.hasExitSite(node->origin.semantic, BadIndexingType)
+                && !m_graph.hasExitSite(node->origin.semantic, ExoticObjectMode)) {
+                
+                auto uid = m_graph.identifiers()[node->identifierNumber()];
+                
+                if (uid == vm().propertyNames->lastIndex.impl()
+                    && node->child1()->shouldSpeculateRegExpObject()) {
+                    node->setOp(SetRegExpObjectLastIndex);
+                    fixEdge<RegExpObjectUse>(node->child1());
+                    speculateForBarrier(node->child2());
+                    break;
+                }
+            }
+            
             fixEdge<CellUse>(node->child1());
             break;
         }
@@ -1123,8 +1159,7 @@ private:
         case CheckStructure:
         case CheckCell:
         case CreateThis:
-        case GetButterfly:
-        case GetButterflyReadOnly: {
+        case GetButterfly: {
             fixEdge<CellUse>(node->child1());
             break;
         }
@@ -1242,7 +1277,6 @@ private:
         case CheckTierUpInLoop:
         case CheckTierUpAtReturn:
         case CheckTierUpAndOSREnter:
-        case CheckTierUpWithNestedTriggerAndOSREnter:
         case InvalidationPoint:
         case CheckArray:
         case CheckInBounds:
@@ -1271,6 +1305,9 @@ private:
         case KillStack:
         case GetStack:
         case StoreBarrier:
+        case GetRegExpObjectLastIndex:
+        case SetRegExpObjectLastIndex:
+        case RecordRegExpCachedResult:
             // These are just nodes that we don't currently expect to see during fixup.
             // If we ever wanted to insert them prior to fixup, then we just have to create
             // fixup rules for them.
@@ -1369,22 +1406,12 @@ private:
             RefPtr<TypeSet> typeSet = node->typeLocation()->m_instructionTypeSet;
             RuntimeTypeMask seenTypes = typeSet->seenTypes();
             if (typeSet->doesTypeConformTo(TypeMachineInt)) {
-                if (node->child1()->shouldSpeculateInt32()) {
+                if (node->child1()->shouldSpeculateInt32())
                     fixEdge<Int32Use>(node->child1());
-                    node->remove();
-                    break;
-                }
-
-                if (enableInt52()) {
+                else
                     fixEdge<MachineIntUse>(node->child1());
-                    node->remove();
-                    break;
-                }
-
-                // Must not perform fixEdge<NumberUse> here since the type set only includes TypeMachineInt. Double values should be logged.
-            }
-
-            if (typeSet->doesTypeConformTo(TypeNumber | TypeMachineInt)) {
+                node->remove();
+            } else if (typeSet->doesTypeConformTo(TypeNumber | TypeMachineInt)) {
                 fixEdge<NumberUse>(node->child1());
                 node->remove();
             } else if (typeSet->doesTypeConformTo(TypeString)) {
@@ -1415,9 +1442,11 @@ private:
             break;
         }
 
-        case NewArrowFunction: {
-            fixEdge<CellUse>(node->child1());
-            fixEdge<CellUse>(node->child2());
+        case SetFunctionName: {
+            // The first child is guaranteed to be a cell because op_set_function_name is only used
+            // on a newly instantiated function object (the first child).
+            fixEdge<KnownCellUse>(node->child1());
+            fixEdge<UntypedUse>(node->child2());
             break;
         }
 
@@ -1431,6 +1460,7 @@ private:
         // Have these no-op cases here to ensure that nobody forgets to add handlers for new opcodes.
         case SetArgument:
         case JSConstant:
+        case LazyJSConstant:
         case DoubleConstant:
         case GetLocal:
         case GetCallee:
@@ -1459,7 +1489,6 @@ private:
         case NewObject:
         case NewArrayBuffer:
         case NewRegexp:
-        case Breakpoint:
         case ProfileWillCall:
         case ProfileDidCall:
         case IsUndefined:
@@ -1480,6 +1509,8 @@ private:
         case CheckBadCell:
         case CheckNotEmpty:
         case CheckWatchdogTimer:
+        case LogShadowChickenPrologue:
+        case LogShadowChickenTail:
         case Unreachable:
         case ExtractOSREntryLocal:
         case LoopHint:
@@ -2183,7 +2214,7 @@ private:
                 attemptToForceStringArrayModeByToStringConversion<StringOrStringObjectUse>(arrayMode, node);
         }
             
-        if (!arrayMode.supportsLength())
+        if (!arrayMode.supportsSelfLength())
             return false;
         
         convertToGetArrayLength(node, arrayMode);
@@ -2419,7 +2450,6 @@ private:
     
 bool performFixup(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG Fixup Phase");
     return runPhase<FixupPhase>(graph);
 }
 

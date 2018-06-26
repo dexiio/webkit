@@ -181,13 +181,15 @@ MediaPlayerPrivateGStreamerBase::~MediaPlayerPrivateGStreamerBase()
 {
     m_notifier.cancelPendingNotifications();
 
-    g_signal_handlers_disconnect_matched(m_videoSink.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+    if (m_videoSink)
+        g_signal_handlers_disconnect_matched(m_videoSink.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
 
     g_mutex_clear(&m_sampleMutex);
 
     m_player = nullptr;
 
-    g_signal_handlers_disconnect_matched(m_volumeElement.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+    if (m_volumeElement)
+        g_signal_handlers_disconnect_matched(m_volumeElement.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
 
 #if USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
     if (client())
@@ -670,7 +672,7 @@ void MediaPlayerPrivateGStreamerBase::paintToTextureMapper(TextureMapper& textur
 #endif
 
 #if USE(GSTREAMER_GL)
-PassNativeImagePtr MediaPlayerPrivateGStreamerBase::nativeImageForCurrentTime()
+NativeImagePtr MediaPlayerPrivateGStreamerBase::nativeImageForCurrentTime()
 {
 #if !USE(CAIRO) || !ENABLE(ACCELERATED_2D_CANVAS)
     return nullptr;

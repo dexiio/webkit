@@ -24,12 +24,12 @@
  */
 
 #include "config.h"
-
-#if USE(COORDINATED_GRAPHICS_THREADED)
 #include "ThreadedCompositor.h"
 
+#if USE(COORDINATED_GRAPHICS_THREADED)
+
+#include "CompositingRunLoop.h"
 #include <WebCore/TransformationMatrix.h>
-#include <wtf/CurrentTime.h>
 #include <wtf/RunLoop.h>
 #include <wtf/StdLibExtras.h>
 
@@ -42,72 +42,6 @@
 using namespace WebCore;
 
 namespace WebKit {
-
-class CompositingRunLoop {
-    WTF_MAKE_NONCOPYABLE(CompositingRunLoop);
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    enum UpdateTiming {
-        Immediate,
-        WaitUntilNextFrame,
-    };
-
-    CompositingRunLoop(std::function<void()> updateFunction)
-        : m_runLoop(RunLoop::current())
-        , m_updateTimer(m_runLoop, this, &CompositingRunLoop::updateTimerFired)
-        , m_updateFunction(WTFMove(updateFunction))
-        , m_lastUpdateTime(0)
-    {
-    }
-
-    void callOnCompositingRunLoop(std::function<void()> function)
-    {
-        if (&m_runLoop == &RunLoop::current()) {
-            function();
-            return;
-        }
-
-        m_runLoop.dispatch(WTFMove(function));
-    }
-
-    void setUpdateTimer(UpdateTiming timing = Immediate)
-    {
-        if (m_updateTimer.isActive())
-            return;
-
-        const static double targetFPS = 60;
-        double nextUpdateTime = 0;
-        if (timing == WaitUntilNextFrame)
-            nextUpdateTime = std::max((1 / targetFPS) - (monotonicallyIncreasingTime() - m_lastUpdateTime), 0.0);
-
-        m_updateTimer.startOneShot(nextUpdateTime);
-    }
-
-    void stopUpdateTimer()
-    {
-        if (m_updateTimer.isActive())
-            m_updateTimer.stop();
-    }
-
-    RunLoop& runLoop()
-    {
-        return m_runLoop;
-    }
-
-private:
-
-    void updateTimerFired()
-    {
-        m_updateFunction();
-        m_lastUpdateTime = monotonicallyIncreasingTime();
-    }
-
-    RunLoop& m_runLoop;
-    RunLoop::Timer<CompositingRunLoop> m_updateTimer;
-    std::function<void()> m_updateFunction;
-
-    double m_lastUpdateTime;
-};
 
 Ref<ThreadedCompositor> ThreadedCompositor::create(Client* client)
 {
@@ -130,7 +64,7 @@ ThreadedCompositor::~ThreadedCompositor()
 void ThreadedCompositor::setNeedsDisplay()
 {
     RefPtr<ThreadedCompositor> protector(this);
-    callOnCompositingThread([=] {
+    callOnCompositingThread([protector] {
         protector->scheduleDisplayImmediately();
     });
 }
@@ -138,7 +72,7 @@ void ThreadedCompositor::setNeedsDisplay()
 void ThreadedCompositor::setNativeSurfaceHandleForCompositing(uint64_t handle)
 {
     RefPtr<ThreadedCompositor> protector(this);
-    callOnCompositingThread([=] {
+    callOnCompositingThread([protector, handle] {
         protector->m_nativeSurfaceHandle = handle;
         protector->m_scene->setActive(true);
     });
@@ -147,24 +81,24 @@ void ThreadedCompositor::setNativeSurfaceHandleForCompositing(uint64_t handle)
 void ThreadedCompositor::setDeviceScaleFactor(float scale)
 {
     RefPtr<ThreadedCompositor> protector(this);
-    callOnCompositingThread([=] {
+    callOnCompositingThread([protector, scale] {
         protector->m_deviceScaleFactor = scale;
         protector->scheduleDisplayImmediately();
     });
 }
 
-void ThreadedCompositor::didChangeViewportSize(const IntSize& newSize)
+void ThreadedCompositor::didChangeViewportSize(const IntSize& size)
 {
     RefPtr<ThreadedCompositor> protector(this);
-    callOnCompositingThread([=] {
-        protector->viewportController()->didChangeViewportSize(newSize);
+    callOnCompositingThread([protector, size] {
+        protector->viewportController()->didChangeViewportSize(size);
     });
 }
 
 void ThreadedCompositor::didChangeViewportAttribute(const ViewportAttributes& attr)
 {
     RefPtr<ThreadedCompositor> protector(this);
-    callOnCompositingThread([=] {
+    callOnCompositingThread([protector, attr] {
         protector->viewportController()->didChangeViewportAttribute(attr);
     });
 }
@@ -172,7 +106,7 @@ void ThreadedCompositor::didChangeViewportAttribute(const ViewportAttributes& at
 void ThreadedCompositor::didChangeContentsSize(const IntSize& size)
 {
     RefPtr<ThreadedCompositor> protector(this);
-    callOnCompositingThread([=] {
+    callOnCompositingThread([protector, size] {
         protector->viewportController()->didChangeContentsSize(size);
     });
 }
@@ -180,7 +114,7 @@ void ThreadedCompositor::didChangeContentsSize(const IntSize& size)
 void ThreadedCompositor::scrollTo(const IntPoint& position)
 {
     RefPtr<ThreadedCompositor> protector(this);
-    callOnCompositingThread([=] {
+    callOnCompositingThread([protector, position] {
         protector->viewportController()->scrollTo(position);
     });
 }
@@ -188,7 +122,7 @@ void ThreadedCompositor::scrollTo(const IntPoint& position)
 void ThreadedCompositor::scrollBy(const IntSize& delta)
 {
     RefPtr<ThreadedCompositor> protector(this);
-    callOnCompositingThread([=] {
+    callOnCompositingThread([protector, delta] {
         protector->viewportController()->scrollBy(delta);
     });
 }
@@ -250,10 +184,11 @@ void ThreadedCompositor::scheduleDisplayImmediately()
 
 void ThreadedCompositor::didChangeVisibleRect()
 {
+    RefPtr<ThreadedCompositor> protector(this);
     FloatRect visibleRect = viewportController()->visibleContentsRect();
     float scale = viewportController()->pageScaleFactor();
-    callOnMainThread([=] {
-        m_client->setVisibleContentsRect(visibleRect, FloatPoint::zero(), scale);
+    RunLoop::main().dispatch([protector, visibleRect, scale] {
+        protector->m_client->setVisibleContentsRect(visibleRect, FloatPoint::zero(), scale);
     });
 
     scheduleDisplayImmediately();
@@ -289,7 +224,7 @@ void ThreadedCompositor::updateSceneState(const CoordinatedGraphicsState& state)
     setNeedsDisplay();
 }
 
-void ThreadedCompositor::callOnCompositingThread(std::function<void()> function)
+void ThreadedCompositor::callOnCompositingThread(std::function<void()>&& function)
 {
     m_compositingRunLoop->callOnCompositingRunLoop(WTFMove(function));
 }
@@ -331,8 +266,10 @@ void ThreadedCompositor::runCompositingThread()
 
     {
         LockHolder locker(m_terminateRunLoopConditionMutex);
-        m_compositingRunLoop = nullptr;
         m_context = nullptr;
+        m_scene = nullptr;
+        m_viewportController = nullptr;
+        m_compositingRunLoop = nullptr;
         m_terminateRunLoopCondition.notifyOne();
     }
 

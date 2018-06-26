@@ -98,12 +98,12 @@ public:
 
     virtual ~GetDatabaseNamesCallback() { }
 
-    virtual bool operator==(const EventListener& other) override
+    bool operator==(const EventListener& other) override
     {
         return this == &other;
     }
 
-    virtual void handleEvent(ScriptExecutionContext*, Event* event) override
+    void handleEvent(ScriptExecutionContext*, Event* event) override
     {
         if (!m_requestCallback->isActive())
             return;
@@ -162,12 +162,12 @@ public:
 
     virtual ~OpenDatabaseCallback() { }
 
-    virtual bool operator==(const EventListener& other) override
+    bool operator==(const EventListener& other) override
     {
         return this == &other;
     }
 
-    virtual void handleEvent(ScriptExecutionContext*, Event* event) override
+    void handleEvent(ScriptExecutionContext*, Event* event) override
     {
         if (event->type() != eventNames().successEvent) {
             m_executableWithDatabase->requestCallback().sendFailure("Unexpected event type.");
@@ -185,13 +185,10 @@ public:
             m_executableWithDatabase->requestCallback().sendFailure("Unexpected result type.");
             return;
         }
-        if (!requestResult->isLegacy()) {
-            m_executableWithDatabase->requestCallback().sendFailure("Only Legacy IDB is supported right now.");
-            return;
-        }
 
         // FIXME (webkit.org/b/154686) - Reimplement this.
-        m_executableWithDatabase->execute();
+        m_executableWithDatabase->requestCallback().sendFailure("Modern IDB is not supported yet");
+        return;
     }
 
 private:
@@ -205,7 +202,13 @@ void ExecutableWithDatabase::start(IDBFactory* idbFactory, SecurityOrigin*, cons
 {
     Ref<OpenDatabaseCallback> callback = OpenDatabaseCallback::create(this);
     ExceptionCode ec = 0;
-    RefPtr<IDBOpenDBRequest> idbOpenDBRequest = idbFactory->open(context(), databaseName, ec);
+
+    if (!context()) {
+        requestCallback().sendFailure("Could not open database.");
+        return;
+    }
+
+    RefPtr<IDBOpenDBRequest> idbOpenDBRequest = idbFactory->open(*context(), databaseName, ec);
     if (ec) {
         requestCallback().sendFailure("Could not open database.");
         return;
@@ -222,7 +225,7 @@ public:
 
     virtual ~DatabaseLoader() { }
 
-    virtual void execute() override
+    void execute() override
     {
         if (!requestCallback().isActive())
             return;
@@ -230,7 +233,7 @@ public:
         // FIXME (webkit.org/b/154686) - Reimplement this.
     }
 
-    virtual RequestCallback& requestCallback() override { return m_requestCallback.get(); }
+    RequestCallback& requestCallback() override { return m_requestCallback.get(); }
 private:
     DatabaseLoader(ScriptExecutionContext* context, Ref<RequestDatabaseCallback>&& requestCallback)
         : ExecutableWithDatabase(context)
@@ -325,12 +328,12 @@ public:
 
     virtual ~OpenCursorCallback() { }
 
-    virtual bool operator==(const EventListener& other) override
+    bool operator==(const EventListener& other) override
     {
         return this == &other;
     }
 
-    virtual void handleEvent(ScriptExecutionContext*, Event* event) override
+    void handleEvent(ScriptExecutionContext*, Event* event) override
     {
         if (event->type() != eventNames().successEvent) {
             m_requestCallback->sendFailure("Unexpected event type.");
@@ -419,7 +422,7 @@ public:
 
     virtual ~DataLoader() { }
 
-    virtual void execute() override
+    void execute() override
     {
         if (!requestCallback().isActive())
             return;
@@ -427,7 +430,7 @@ public:
         // FIXME (webkit.org/b/154686) - Reimplement this.
     }
 
-    virtual RequestCallback& requestCallback() override { return m_requestCallback.get(); }
+    RequestCallback& requestCallback() override { return m_requestCallback.get(); }
     DataLoader(ScriptExecutionContext* scriptExecutionContext, Ref<RequestDataCallback>&& requestCallback, const InjectedScript& injectedScript, const String& objectStoreName, const String& indexName, RefPtr<IDBKeyRange> idbKeyRange, int skipCount, unsigned pageSize)
         : ExecutableWithDatabase(scriptExecutionContext)
         , m_requestCallback(WTFMove(requestCallback))
@@ -513,7 +516,7 @@ void InspectorIndexedDBAgent::requestDatabaseNames(ErrorString& errorString, con
         return;
 
     ExceptionCode ec = 0;
-    RefPtr<IDBRequest> idbRequest = idbFactory->getDatabaseNames(document, ec);
+    RefPtr<IDBRequest> idbRequest = idbFactory->getDatabaseNames(*document, ec);
     if (!idbRequest || ec) {
         requestCallback->sendFailure("Could not obtain database names.");
         return;
@@ -570,12 +573,12 @@ public:
 
     virtual ~ClearObjectStoreListener() { }
 
-    virtual bool operator==(const EventListener& other) override
+    bool operator==(const EventListener& other) override
     {
         return this == &other;
     }
 
-    virtual void handleEvent(ScriptExecutionContext*, Event* event) override
+    void handleEvent(ScriptExecutionContext*, Event* event) override
     {
         if (!m_requestCallback->isActive())
             return;
@@ -611,7 +614,7 @@ public:
     {
     }
 
-    virtual void execute() override
+    void execute() override
     {
         if (!requestCallback().isActive())
             return;
@@ -619,7 +622,7 @@ public:
         // FIXME (webkit.org/b/154686) - Reimplement this.
     }
 
-    virtual RequestCallback& requestCallback() override { return m_requestCallback.get(); }
+    RequestCallback& requestCallback() override { return m_requestCallback.get(); }
 private:
     const String m_objectStoreName;
     Ref<ClearObjectStoreCallback> m_requestCallback;

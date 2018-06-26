@@ -107,8 +107,8 @@ public:
     bool active() const { return m_active; }
 
     // EventTarget interface
-    virtual ScriptExecutionContext* scriptExecutionContext() const override { return ActiveDOMObject::scriptExecutionContext(); }
-    virtual EventTargetInterface eventTargetInterface() const override { return SourceBufferEventTargetInterfaceType; }
+    ScriptExecutionContext* scriptExecutionContext() const override { return ActiveDOMObject::scriptExecutionContext(); }
+    EventTargetInterface eventTargetInterface() const override { return SourceBufferEventTargetInterfaceType; }
 
     using RefCounted<SourceBuffer>::ref;
     using RefCounted<SourceBuffer>::deref;
@@ -125,13 +125,16 @@ public:
 
     void rangeRemoval(const MediaTime&, const MediaTime&);
 
+    bool isBufferedDirty() const { return m_bufferedDirty; }
+    void setBufferedDirty(bool flag) { m_bufferedDirty = flag; }
+
     // ActiveDOMObject API.
     bool hasPendingActivity() const override;
 
 protected:
     // EventTarget interface
-    virtual void refEventTarget() override { ref(); }
-    virtual void derefEventTarget() override { deref(); }
+    void refEventTarget() override { ref(); }
+    void derefEventTarget() override { deref(); }
 
 private:
     SourceBuffer(Ref<SourceBufferPrivate>&&, MediaSource*);
@@ -142,29 +145,29 @@ private:
     bool canSuspendForDocumentSuspension() const override;
 
     // SourceBufferPrivateClient
-    virtual void sourceBufferPrivateDidEndStream(SourceBufferPrivate*, const WTF::AtomicString&) override;
-    virtual void sourceBufferPrivateDidReceiveInitializationSegment(SourceBufferPrivate*, const InitializationSegment&) override;
-    virtual void sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, PassRefPtr<MediaSample>) override;
-    virtual bool sourceBufferPrivateHasAudio(const SourceBufferPrivate*) const override;
-    virtual bool sourceBufferPrivateHasVideo(const SourceBufferPrivate*) const override;
-    virtual void sourceBufferPrivateDidBecomeReadyForMoreSamples(SourceBufferPrivate*, AtomicString trackID) override;
-    virtual MediaTime sourceBufferPrivateFastSeekTimeForMediaTime(SourceBufferPrivate*, const MediaTime&, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold) override;
-    virtual void sourceBufferPrivateAppendComplete(SourceBufferPrivate*, AppendResult) override;
-    virtual void sourceBufferPrivateDidReceiveRenderingError(SourceBufferPrivate*, int errorCode) override;
+    void sourceBufferPrivateDidEndStream(SourceBufferPrivate*, const WTF::AtomicString&) override;
+    void sourceBufferPrivateDidReceiveInitializationSegment(SourceBufferPrivate*, const InitializationSegment&) override;
+    void sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, PassRefPtr<MediaSample>) override;
+    bool sourceBufferPrivateHasAudio(const SourceBufferPrivate*) const override;
+    bool sourceBufferPrivateHasVideo(const SourceBufferPrivate*) const override;
+    void sourceBufferPrivateDidBecomeReadyForMoreSamples(SourceBufferPrivate*, AtomicString trackID) override;
+    MediaTime sourceBufferPrivateFastSeekTimeForMediaTime(SourceBufferPrivate*, const MediaTime&, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold) override;
+    void sourceBufferPrivateAppendComplete(SourceBufferPrivate*, AppendResult) override;
+    void sourceBufferPrivateDidReceiveRenderingError(SourceBufferPrivate*, int errorCode) override;
 
     // AudioTrackClient
-    virtual void audioTrackEnabledChanged(AudioTrack*) override;
+    void audioTrackEnabledChanged(AudioTrack*) override;
 
     // VideoTrackClient
-    virtual void videoTrackSelectedChanged(VideoTrack*) override;
+    void videoTrackSelectedChanged(VideoTrack*) override;
 
     // TextTrackClient
-    virtual void textTrackKindChanged(TextTrack*) override;
-    virtual void textTrackModeChanged(TextTrack*) override;
-    virtual void textTrackAddCues(TextTrack*, const TextTrackCueList*) override;
-    virtual void textTrackRemoveCues(TextTrack*, const TextTrackCueList*) override;
-    virtual void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>) override;
-    virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>) override;
+    void textTrackKindChanged(TextTrack*) override;
+    void textTrackModeChanged(TextTrack*) override;
+    void textTrackAddCues(TextTrack*, const TextTrackCueList*) override;
+    void textTrackRemoveCues(TextTrack*, const TextTrackCueList*) override;
+    void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>) override;
+    void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>) override;
 
     static const WTF::AtomicString& decodeError();
     static const WTF::AtomicString& networkError();
@@ -225,6 +228,7 @@ private:
 
     HashMap<AtomicString, TrackBuffer> m_trackBufferMap;
     RefPtr<TimeRanges> m_buffered;
+    bool m_bufferedDirty { true };
 
     enum AppendStateType { WaitingForSegment, ParsingInitSegment, ParsingMediaSegment };
     AppendStateType m_appendState;

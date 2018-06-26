@@ -112,6 +112,9 @@ webkit.org/b/127860 [ Debug ] js/function-apply-aliased.html [ Skip ]
 # This test verifies dynamic manipulation of the mroot and msqrt elements.
 mathml/roots-removeChild.html [ ImageOnlyFailure ]
 
+# For now we ignore margin/padding/border properties of MathML renderers.
+mathml/presentation/bug97990.html [ Skip ]
+
 # This test verifies that a mismatch reftest will fail as intended if both results are same. (introduced in r93187)
 fast/harness/sample-fail-mismatch-reftest.html [ WontFix ImageOnlyFailure ]
 
@@ -293,8 +296,9 @@ webkit.org/b/154310 [ Debug ] imported/w3c/web-platform-tests/html/dom/reflectio
 
 # WPT tests that fail after doing full test repository reimport and need further investigation
 imported/w3c/web-platform-tests/XMLHttpRequest/send-entity-body-document.htm [ Pass Failure ]
-imported/w3c/web-platform-tests/dom/nodes/MutationObserver-childList.html [ Timeout ]
 imported/w3c/web-platform-tests/dom/nodes/Document-createElement-namespace.html [ Pass Failure ]
+webkit.org/b/155516 [ Debug ] imported/w3c/web-platform-tests/html/semantics/embedded-content/the-area-element/area-coords.html [ Skip ]
+webkit.org/b/155516 [ Release ] imported/w3c/web-platform-tests/html/semantics/embedded-content/the-area-element/area-coords.html [ Failure ]
 
 # W3C XMLHttpRequest tests
 imported/w3c/web-platform-tests/XMLHttpRequest/xmlhttprequest-timeout-aborted.html [ Slow ]
@@ -314,7 +318,6 @@ imported/w3c/web-platform-tests/XMLHttpRequest/xmlhttprequest-timeout-worker-twi
 imported/w3c/web-platform-tests/XMLHttpRequest/send-redirect-bogus.htm [ Skip ]
 imported/w3c/web-platform-tests/XMLHttpRequest/send-redirect-to-cors.htm [ Skip ]
 imported/w3c/web-platform-tests/XMLHttpRequest/send-redirect-to-non-cors.htm [ Skip ]
-
 
 # New W3C ref tests that are failing.
 webkit.org/b/148856 imported/w3c/web-platform-tests/html/semantics/embedded-content/the-video-element/video_initially_paused.html [ ImageOnlyFailure ]
@@ -377,12 +380,6 @@ imported/w3c/web-platform-tests/tools [ Skip ]
 # Tests marked as pass or fail until wpt server proves to be stable enough
 imported/w3c/web-platform-tests/domparsing/DOMParser-parseFromString-html.html [ Pass Failure ]
 imported/w3c/web-platform-tests/domparsing/insert-adjacent.html [ Pass Failure ]
-
-# W3C html timing out tests
-imported/w3c/web-platform-tests/html/dom/dynamic-markup-insertion/opening-the-input-stream/010.html [ Failure Timeout ]
-imported/w3c/web-platform-tests/html/semantics/document-metadata/the-link-element/link-style-error-01.html [ Timeout ]
-imported/w3c/web-platform-tests/html/semantics/document-metadata/the-style-element/style-error-01.html [ Timeout ]
-imported/w3c/web-platform-tests/html/semantics/embedded-content/the-img-element/environment-changes/viewport-change.html [ Timeout ]
 
 # Imported W3C canvas failed tests
 webkit.org/b/138676 imported/w3c/canvas/2d.pattern.image.null.html [ Failure ]
@@ -474,7 +471,6 @@ webkit.org/b/139595 http/tests/xmlhttprequest/workers/abort-exception-assert.htm
 [ Debug ] fast/history/history-back-while-pdf-in-pagecache.html [ Skip ]
 webkit.org/b/121628 [ Release ] fast/history/history-back-while-pdf-in-pagecache.html [ Pass ImageOnlyFailure ]
 [ Debug ] fullscreen/full-screen-iframe-legacy.html [ Pass Crash ]
-webkit.org/b/151488 [ Debug ] imported/blink/editing/selection/deleteFromDocument-undo-crash.html [ Skip ]
 
 webkit.org/b/139634 [ Debug ] fast/selectors/matches-backtracking.html [ Slow ]
 webkit.org/b/139634 [ Debug ] fast/selectors/nth-child-of-register-requirement.html [ Slow ]
@@ -500,6 +496,9 @@ imported/w3c/web-platform-tests/html/dom/elements/global-attributes/dir_auto-pre
 imported/w3c/web-platform-tests/html/dom/elements/global-attributes/dir_auto-textarea-N-between-Rs.html [ ImageOnlyFailure ]
 imported/w3c/web-platform-tests/html/dom/elements/global-attributes/dir_auto-textarea-script-N-between-Rs.html [ ImageOnlyFailure ]
 imported/w3c/web-platform-tests/html/dom/elements/global-attributes/style-01.html [ ImageOnlyFailure ]
+
+imported/w3c/web-platform-tests/html/dom/dynamic-markup-insertion/opening-the-input-stream/010.html [ Failure Timeout ]
+imported/w3c/web-platform-tests/html/semantics/embedded-content/the-img-element/environment-changes/viewport-change.html [ Failure ]
 
 # Imported Mozilla SVG tests
 webkit.org/b/5968 imported/mozilla/svg/linearGradient-basic-03.svg [ ImageOnlyFailure ]
@@ -667,8 +666,6 @@ webkit.org/b/142937 ietestcenter/Javascript/15.2.3.14-1-3.html [ Failure ]
 
 [ Debug ] js/regress-141098.html [ Slow ]
 
-webkit.org/b/144258 [ Debug ] js/class-syntax-semicolon.html [ Skip ]
-
 # IDBVersionChangeEvent tests need to be rewritten to use event constructors instead of createEvent,
 # after we implement the IDBVersionChangeEvent constructor.
 webkit.org/b/145390 storage/indexeddb/events.html [ Failure ]
@@ -794,10 +791,10 @@ fast/table/hittest-tablecell-right-edge.html [ Pass Failure ]
 css3/flexbox/multiline-reverse-wrap-baseline.html [ ImageOnlyFailure ]
 ietestcenter/css3/flexbox/flexbox-layout-001.htm [ ImageOnlyFailure ]
 
-#
 webkit.org/b/150598 fast/repaint/table-hover-on-link.html [ Pass Failure ]
 
 webkit.org/b/151949 streams/reference-implementation/pipe-to.html [ Failure ]
+webkit.org/b/154687 streams/pipe-to.html [ Slow ]
 
 webkit.org/b/52185 fast/css/vertical-align-baseline-rowspan-010.html [ ImageOnlyFailure ]
 
@@ -809,6 +806,7 @@ webkit.org/b/155634 http/tests/security/shape-image-cors-redirect-error-message-
 # Content Security Policy failures
 webkit.org/b/85558 http/tests/security/contentSecurityPolicy/1.1
 http/tests/security/contentSecurityPolicy/1.1/child-src [ Pass ]
+http/tests/security/contentSecurityPolicy/1.1/frame-ancestors [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/form-action-src-allowed.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/form-action-src-blocked.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/form-action-src-default-ignored.html [ Pass ]
@@ -825,6 +823,7 @@ http/tests/security/contentSecurityPolicy/1.1/scripthash-basic-blocked.html [ Pa
 http/tests/security/contentSecurityPolicy/1.1/scripthash-default-src.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/scripthash-ignore-unsafeinline.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/scripthash-malformed.html [ Pass ]
+http/tests/security/contentSecurityPolicy/1.1/scripthash-multiple-policies.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/scripthash-tests.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/scripthash-unicode-normalization.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/scriptnonce-allowed.html [ Pass ]
@@ -840,8 +839,12 @@ http/tests/security/contentSecurityPolicy/1.1/securitypolicyviolation-block-cros
 http/tests/security/contentSecurityPolicy/1.1/securitypolicyviolation-block-image-from-script.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/securitypolicyviolation-block-image-https.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/securitypolicyviolation-block-image.html [ Pass ]
+http/tests/security/contentSecurityPolicy/1.1/securityviolationpolicy-block-frame-using-child-src.html [ Pass ]
+http/tests/security/contentSecurityPolicy/1.1/securityviolationpolicy-block-frame-using-default-src.html [ Pass ]
+http/tests/security/contentSecurityPolicy/1.1/securityviolationpolicy-block-frame-using-frame-src.html  [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/stylehash-allowed.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/stylehash-basic-blocked.html [ Pass ]
+http/tests/security/contentSecurityPolicy/1.1/stylehash-multiple-policies.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/stylenonce-allowed.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/stylenonce-blocked.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/plugintypes-affects-child.html [ Pass ]
@@ -856,7 +859,6 @@ http/tests/security/contentSecurityPolicy/1.1/plugintypes-url-01.html [ Pass ]
 http/tests/security/contentSecurityPolicy/1.1/plugintypes-url-02.html [ Pass ]
 webkit.org/b/154203 http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-overrides-xfo.html
 webkit.org/b/111869 http/tests/security/contentSecurityPolicy/eval-blocked-and-sends-report.html
-webkit.org/b/115700 http/tests/security/contentSecurityPolicy/inline-event-handler-blocked-after-injecting-meta.html [ Failure ]
 webkit.org/b/153148 http/tests/security/contentSecurityPolicy/eval-allowed-in-report-only-mode-and-sends-report.html
 webkit.org/b/153150 http/tests/security/contentSecurityPolicy/frame-src-cross-origin-load.html
 webkit.org/b/153150 http/tests/security/contentSecurityPolicy/1.1/child-src/frame-fires-load-event-when-blocked.html
@@ -891,6 +893,9 @@ loader/stateobjects/replacestate-size.html [ Slow ]
 # outline: auto -focusring.
 imported/blink/fast/multicol/outlines-at-column-boundaries.html [ ImageOnlyFailure ]
 fast/multicol/multicol-with-child-renderLayer-for-input.html [ ImageOnlyFailure ]
+
+# Assertion failure in MessagePort::contextDestroyed, usually attributed to later tests
+webkit.org/b/94458 http/tests/security/MessagePort/event-listener-context.html [ Skip ]
 
 ########################################
 ### START OF IndexedDB failures
@@ -928,7 +933,7 @@ storage/indexeddb/delete-closed-database-object.html [ Skip ]
 storage/indexeddb/request-leak-private.html [ Failure ]
 storage/indexeddb/request-leak.html [ Failure ]
 
-webkit.org/b/154619 storage/indexeddb/odd-strings.html [ Pass Timeout ]
+webkit.org/b/154619 storage/indexeddb/odd-strings.html [ Skip ]
 
 # No workers support in Modern IDB yet
 http/tests/security/cross-origin-worker-indexeddb-allowed.html
@@ -953,9 +958,6 @@ storage/indexeddb/transaction-complete-workers-private.html
 storage/indexeddb/transaction-complete-workers.html
 storage/indexeddb/unprefix-workers.html
 
-# Need a different way to get database names to the web inspector
-inspector/indexeddb/requestDatabaseNames.html
-
 # Test's behavior specific to Legacy IDB with LevelDB backend
 # Modern IDB is spec-compliant without supporting this behavior
 storage/indexeddb/transaction-starvation.html [ Skip ]
@@ -979,5 +981,47 @@ storage/indexeddb/modern/transaction-scheduler-5.html [ Skip ]
 storage/indexeddb/modern/transaction-scheduler-6.html [ Skip ]
 storage/indexeddb/transaction-coordination-within-database.html [ Skip ]
 
+# Inspector doesn't support modern IDB yet
+webkit.org/b/154686 inspector/indexeddb/requestDatabaseNames.html [ Skip ]
+
+# These two IDB tests are, by their nature, very slow
+# Skip these until we have a fix for webkit.org/b/155041
+storage/indexeddb/modern/exceed-open-file-limit.html [ Skip ]
+webkit.org/b/155028 storage/indexeddb/modern/256-open-databases.html [ Skip ]
+
+# Fixed by upcoming MathML refactoring
+webkit.org/b/155019 mathml/presentation/menclose-notation-attribute-change-value.html [ Skip ]
+
 ### END OF IndexedDB failures
 ########################################
+
+# RTL Scrollbars are only implemented on certain versions of OS X
+fast/scrolling/rtl-scrollbars.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-simple.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-overflow-contents.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-overflow-dir-rtl.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-overflow-padding.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-overflow-simple.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-overflow.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-overflow-elementFromPoint.html [ Failure ]
+fast/scrolling/rtl-scrollbars-overflow-position-absolute.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-overflow-text-selection-scrolled.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-position-absolute.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-position-fixed.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-text-selection-scrolled.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-text-selection.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-iframe-offset.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-elementFromPoint-static.html [ Failure ]
+fast/scrolling/rtl-scrollbars-iframe-scrolled.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-positioning.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-listbox-scroll.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-listbox-select-left.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-listbox-select-right.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-listbox-simple.html [ ImageOnlyFailure ]
+fast/scrolling/rtl-scrollbars-listbox.html [ ImageOnlyFailure ]
+
+# <a download> does not support Blobs
+webkit.org/b/156099 http/tests/security/anchor-download-allow-blob.html [ Failure ]
+
+# <a download> does not honor cross-origin restrictions
+webkit.org/b/156100 http/tests/security/anchor-download-block-crossorigin.html [ Failure ]

@@ -76,7 +76,7 @@ public:
     void setScrollPosition(const WebCore::FloatPoint&);
 #endif
     void detach();
-    void appendUpdate(std::function<void()>);
+    void appendUpdate(std::function<void()>&&);
 
     WebCore::TextureMapperLayer* findScrollableContentsLayerAt(const WebCore::FloatPoint&);
 
@@ -134,8 +134,8 @@ private:
     void syncRemoteContent();
     void adjustPositionForFixedLayers(const WebCore::FloatPoint& contentPosition);
 
-    void dispatchOnMainThread(std::function<void()>);
-    void dispatchOnClientRunLoop(std::function<void()>);
+    void dispatchOnMainThread(std::function<void()>&&);
+    void dispatchOnClientRunLoop(std::function<void()>&&);
     void updateViewport();
     void renderNextFrame();
     void purgeBackingStores();
@@ -156,7 +156,7 @@ private:
     void dispatchCommitScrollOffset(uint32_t layerID, const WebCore::IntSize& offset);
 
 #if USE(COORDINATED_GRAPHICS_THREADED)
-    virtual void onNewBufferAvailable() override;
+    void onNewBufferAvailable() override;
 #endif
 
     // Render queue can be accessed ony from main thread or updatePaintNode call stack!

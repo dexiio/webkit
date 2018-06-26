@@ -115,6 +115,26 @@ WEBKIT_API GType
 webkit_dom_test_obj_get_type(void);
 
 /**
+ * webkit_dom_test_obj_enabled_at_runtime_operation:
+ * @self: A #WebKitDOMTestObj
+ * @testParam: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API void
+webkit_dom_test_obj_enabled_at_runtime_operation(WebKitDOMTestObj* self, const gchar* testParam);
+
+/**
+ * webkit_dom_test_obj_enabled_at_runtime_operation:
+ * @self: A #WebKitDOMTestObj
+ * @testParam: A #glong
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API void
+webkit_dom_test_obj_enabled_at_runtime_operation(WebKitDOMTestObj* self, glong testParam);
+
+/**
  * webkit_dom_test_obj_void_method:
  * @self: A #WebKitDOMTestObj
  *
@@ -245,6 +265,39 @@ webkit_dom_test_obj_obj_method_with_args(WebKitDOMTestObj* self, glong longArg, 
 **/
 WEBKIT_API glong
 webkit_dom_test_obj_unforgeable_method(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_method_with_arg_treating_null_as_empty_string:
+ * @self: A #WebKitDOMTestObj
+ * @arg: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API void
+webkit_dom_test_obj_method_with_arg_treating_null_as_empty_string(WebKitDOMTestObj* self, const gchar* arg);
+
+/**
+ * webkit_dom_test_obj_nullable_string_method:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Returns: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API gchar*
+webkit_dom_test_obj_nullable_string_method(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_nullable_string_special_method:
+ * @self: A #WebKitDOMTestObj
+ * @index: A #gulong
+ *
+ * Returns: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API gchar*
+webkit_dom_test_obj_nullable_string_special_method(WebKitDOMTestObj* self, gulong index);
 
 /**
  * webkit_dom_test_obj_method_with_enum_arg:
@@ -404,6 +457,15 @@ WEBKIT_API WebKitDOMTestObj*
 webkit_dom_test_obj_with_script_execution_context_and_script_state_with_spaces(WebKitDOMTestObj* self);
 
 /**
+ * webkit_dom_test_obj_with_document_argument:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API void
+webkit_dom_test_obj_with_document_argument(WebKitDOMTestObj* self);
+
+/**
  * webkit_dom_test_obj_method_with_optional_arg:
  * @self: A #WebKitDOMTestObj
  * @opt: A #glong
@@ -536,24 +598,24 @@ WEBKIT_API void
 webkit_dom_test_obj_convert2(WebKitDOMTestObj* self, WebKitDOMTestNode* value);
 
 /**
- * webkit_dom_test_obj_convert4:
+ * webkit_dom_test_obj_convert3:
  * @self: A #WebKitDOMTestObj
- * @value: A #WebKitDOMTestNode
+ * @value: A #gchar
  *
  * Stability: Unstable
 **/
 WEBKIT_API void
-webkit_dom_test_obj_convert4(WebKitDOMTestObj* self, WebKitDOMTestNode* value);
+webkit_dom_test_obj_convert3(WebKitDOMTestObj* self, const gchar* value);
 
 /**
- * webkit_dom_test_obj_convert5:
+ * webkit_dom_test_obj_convert4:
  * @self: A #WebKitDOMTestObj
- * @value: A #WebKitDOMTestNode
+ * @value: A #gchar
  *
  * Stability: Unstable
 **/
 WEBKIT_API void
-webkit_dom_test_obj_convert5(WebKitDOMTestObj* self, WebKitDOMTestNode* value);
+webkit_dom_test_obj_convert4(WebKitDOMTestObj* self, const gchar* value);
 
 /**
  * webkit_dom_test_obj_mutable_point_function:
@@ -914,6 +976,27 @@ WEBKIT_API gchar*
 webkit_dom_test_obj_get_unforgeable_attr(WebKitDOMTestObj* self);
 
 /**
+ * webkit_dom_test_obj_get_string_attr_treating_null_as_empty_string:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Returns: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API gchar*
+webkit_dom_test_obj_get_string_attr_treating_null_as_empty_string(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_set_string_attr_treating_null_as_empty_string:
+ * @self: A #WebKitDOMTestObj
+ * @value: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API void
+webkit_dom_test_obj_set_string_attr_treating_null_as_empty_string(WebKitDOMTestObj* self, const gchar* value);
+
+/**
  * webkit_dom_test_obj_get_xml_obj_attr:
  * @self: A #WebKitDOMTestObj
  *
@@ -1143,6 +1226,27 @@ webkit_dom_test_obj_get_reflected_custom_url_attr(WebKitDOMTestObj* self);
 **/
 WEBKIT_API void
 webkit_dom_test_obj_set_reflected_custom_url_attr(WebKitDOMTestObj* self, const gchar* value);
+
+/**
+ * webkit_dom_test_obj_get_enabled_at_runtime_attribute:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Returns: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API gchar*
+webkit_dom_test_obj_get_enabled_at_runtime_attribute(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_set_enabled_at_runtime_attribute:
+ * @self: A #WebKitDOMTestObj
+ * @value: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API void
+webkit_dom_test_obj_set_enabled_at_runtime_attribute(WebKitDOMTestObj* self, const gchar* value);
 
 /**
  * webkit_dom_test_obj_get_attr_with_getter_exception:
@@ -1683,6 +1787,27 @@ webkit_dom_test_obj_get_nullable_long_settable_attribute(WebKitDOMTestObj* self)
 **/
 WEBKIT_API void
 webkit_dom_test_obj_set_nullable_long_settable_attribute(WebKitDOMTestObj* self, glong value);
+
+/**
+ * webkit_dom_test_obj_get_nullable_string_settable_attribute:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Returns: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API gchar*
+webkit_dom_test_obj_get_nullable_string_settable_attribute(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_set_nullable_string_settable_attribute:
+ * @self: A #WebKitDOMTestObj
+ * @value: A #gchar
+ *
+ * Stability: Unstable
+**/
+WEBKIT_API void
+webkit_dom_test_obj_set_nullable_string_settable_attribute(WebKitDOMTestObj* self, const gchar* value);
 
 /**
  * webkit_dom_test_obj_get_nullable_string_value:

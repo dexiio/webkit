@@ -25,36 +25,21 @@ endmacro()
 
 macro(ADD_PRECOMPILED_HEADER _header _cpp _source)
     if (MSVC)
-        get_filename_component(PrecompiledBasename ${_header} NAME_WE)
-        set(PrecompiledBinary "${CMAKE_CURRENT_BINARY_DIR}/${PrecompiledBasename}.pch")
+        get_filename_component(PrecompiledBasename ${_cpp} NAME_WE)
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${_source}")
+        set(PrecompiledBinary "${CMAKE_CURRENT_BINARY_DIR}/${_source}/${PrecompiledBasename}.pch")
         set(_sources ${${_source}})
 
         set_source_files_properties(${_cpp}
             PROPERTIES COMPILE_FLAGS "/Yc\"${_header}\" /Fp\"${PrecompiledBinary}\""
             OBJECT_OUTPUTS "${PrecompiledBinary}")
         set_source_files_properties(${_sources}
-            PROPERTIES COMPILE_FLAGS "/Yu\"${_header}\" /FI\"${_header}\" /Fp\"${PrecompiledBinary}\"")
-
-        foreach (_src ${_sources})
-            ADD_SOURCE_DEPENDENCIES(${_src} ${PrecompiledBinary})
-        endforeach ()
-
+            PROPERTIES COMPILE_FLAGS "/Yu\"${_header}\" /FI\"${_header}\" /Fp\"${PrecompiledBinary}\""
+            OBJECT_DEPENDS "${PrecompiledBinary}")
         list(APPEND ${_source} ${_cpp})
     endif ()
     #FIXME: Add support for Xcode.
 endmacro()
-
-# TODO: Unify usage of prefix headers and PCH with WebCore and WebKit2
-macro(ADD_PREFIX_HEADER _target _header)
-    if (COMPILER_IS_GCC_OR_CLANG)
-        get_target_property(OLD_COMPILE_FLAGS ${_target} COMPILE_FLAGS)
-        if (${OLD_COMPILE_FLAGS} STREQUAL "OLD_COMPILE_FLAGS-NOTFOUND")
-            set(OLD_COMPILE_FLAGS "")
-        endif ()
-        set_target_properties(${_target} PROPERTIES COMPILE_FLAGS "${OLD_COMPILE_FLAGS} -include ${_header}")
-    endif ()
-endmacro()
-
 
 # Helper macro which wraps generate-bindings.pl script.
 #   _output_source is a list name which will contain generated sources.(eg. WebCore_SOURCES)
@@ -264,13 +249,9 @@ macro(WEBKIT_FRAMEWORK _target)
     add_library(${_target} ${${_target}_LIBRARY_TYPE}
         ${${_target}_HEADERS}
         ${${_target}_SOURCES}
-        ${${_target}_DERIVED_SOURCES}
-        ${${_target}_PRIVATE_HEADERS}
-        ${${_target}_PUBLIC_HEADERS}
     )
     target_link_libraries(${_target} ${${_target}_LIBRARIES})
     set_target_properties(${_target} PROPERTIES COMPILE_DEFINITIONS "BUILDING_${_target}")
-    set_target_properties(${_target} PROPERTIES FOLDER "${_target}")
 
     if (${_target}_OUTPUT_NAME)
         set_target_properties(${_target} PROPERTIES OUTPUT_NAME ${${_target}_OUTPUT_NAME})
@@ -285,16 +266,8 @@ macro(WEBKIT_FRAMEWORK _target)
         add_custom_command(TARGET ${_target} POST_BUILD COMMAND ${${_target}_POST_BUILD_COMMAND} VERBATIM)
     endif ()
 
-    if (APPLE AND NOT PORT STREQUAL "GTK" AND NOT ${${_target}_LIBRARY_TYPE} MATCHES STATIC)
+    if (APPLE AND NOT PORT STREQUAL "GTK" AND NOT ${_target} STREQUAL "WTF")
         set_target_properties(${_target} PROPERTIES FRAMEWORK TRUE)
-        if (${_target}_PUBLIC_HEADERS)
-            set_target_properties(${_target} PROPERTIES PUBLIC_HEADER "${${_target}_PUBLIC_HEADERS}}")
-            if (${_target}_PRIVATE_HEADERS)
-                foreach (CURRENT_PRIVATE_HEADER ${${_target}_PRIVATE_HEADERS})
-                    set_property(SOURCE ${CURRENT_PRIVATE_HEADER} PROPERTY MACOSX_PACKAGE_LOCATION ${${_target}_PRIVATE_HEADERS_LOCATION} )
-                endforeach ()
-            endif ()
-        endif ()
         install(TARGETS ${_target} FRAMEWORK DESTINATION ${LIB_INSTALL_DIR})
     endif ()
 endmacro()
@@ -322,7 +295,8 @@ macro(WEBKIT_CREATE_FORWARDING_HEADER _target_directory _file)
 endmacro()
 
 macro(WEBKIT_CREATE_FORWARDING_HEADERS _framework)
-    if (NOT ${PORT} STREQUAL "Win")
+    # On Windows, we copy the entire contents of forwarding headers.
+    if (NOT WIN32)
         set(_processing_directories 0)
         set(_processing_files 0)
         set(_target_directory "${DERIVED_SOURCES_DIR}/ForwardingHeaders/${_framework}")
@@ -377,23 +351,15 @@ macro(GENERATE_WEBKIT2_MESSAGE_SOURCES _output_source _input_files)
     endforeach ()
 endmacro()
 
-macro(MAKE_JS_FILE_ARRAYS _output_cpp _output_h _namespace _scripts _scripts_dependencies)
-    add_custom_command(
-        OUTPUT ${_output_h} ${_output_cpp}
-        DEPENDS ${JavaScriptCore_SCRIPTS_DIR}/make-js-file-arrays.py ${${_scripts}}
-        COMMAND ${PYTHON_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/make-js-file-arrays.py -n ${_namespace} ${_output_h} ${_output_cpp} ${${_scripts}}
-        VERBATIM)
-    ADD_SOURCE_DEPENDENCIES(${${_scripts_dependencies}} ${_output_h} ${_output_cpp})
-endmacro()
-
 # Helper macro for using all-in-one builds
 # This macro removes the sources included in the _all_in_one_file from the input _file_list.
 # _file_list is a list of source files
 # _all_in_one_file is an all-in-one cpp file includes other cpp files
 # _result_file_list is the output file list
-macro(PROCESS_ALLINONE_FILE _file_list _all_in_one_file _result_file_list)
+macro(PROCESS_ALLINONE_FILE _file_list _all_in_one_file _result_file_list _no_compile)
     file(STRINGS ${_all_in_one_file} _all_in_one_file_content)
     set(${_result_file_list} ${_file_list})
+    set(_allins "")
     foreach (_line ${_all_in_one_file_content})
         string(REGEX MATCH "^#include [\"<](.*)[\">]" _found ${_line})
         if (_found)
@@ -402,7 +368,14 @@ macro(PROCESS_ALLINONE_FILE _file_list _all_in_one_file _result_file_list)
     endforeach ()
 
     foreach (_allin ${_allins})
-        string(REGEX REPLACE ";[^;]*/${_allin};" ";" _new_result "${${_result_file_list}};")
+        if (${_no_compile})
+            # For DerivedSources.cpp, we still need the derived sources to be generated, but we do not want them to be compiled
+            # individually. We add the header to the result file list so that CMake knows to keep generating the files.
+            string(REGEX REPLACE "(.*)\\.cpp" "\\1" _allin_no_ext ${_allin})
+            string(REGEX REPLACE ";([^;]*/)${_allin_no_ext}\\.cpp;" ";\\1${_allin_no_ext}.h;" _new_result "${${_result_file_list}};")
+        else ()
+            string(REGEX REPLACE ";[^;]*/${_allin};" ";" _new_result "${${_result_file_list}};")
+        endif ()
         set(${_result_file_list} ${_new_result})
     endforeach ()
 

@@ -65,7 +65,6 @@
 #include "RenderTheme.h"
 #include "RenderTreePosition.h"
 #include "RenderView.h"
-#include "SVGTextRunRenderingContext.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
 #include "TextBreakIterator.h"
@@ -104,7 +103,7 @@ static void insertIntoTrackedRendererMaps(const RenderBlock& container, RenderBo
         percentHeightDescendantsMap = new TrackedDescendantsMap;
         percentHeightContainerMap = new TrackedContainerMap;
     }
-    
+
     auto& descendantSet = percentHeightDescendantsMap->ensure(&container, [] {
         return std::make_unique<TrackedRendererListHashSet>();
     }).iterator->value;
@@ -115,7 +114,7 @@ static void insertIntoTrackedRendererMaps(const RenderBlock& container, RenderBo
         ASSERT(percentHeightContainerMap->get(&descendant)->contains(&container));
         return;
     }
-    
+
     auto& containerSet = percentHeightContainerMap->ensure(&descendant, [] {
         return std::make_unique<HashSet<const RenderBlock*>>();
     }).iterator->value;
@@ -128,11 +127,11 @@ static void removeFromTrackedRendererMaps(RenderBox& descendant)
 {
     if (!percentHeightDescendantsMap)
         return;
-    
+
     std::unique_ptr<HashSet<const RenderBlock*>> containerSet = percentHeightContainerMap->take(&descendant);
     if (!containerSet)
         return;
-    
+
     for (auto* container : *containerSet) {
         // FIXME: Disabling this assert temporarily until we fix the layout
         // bugs associated with positioned objects not properly cleared from
@@ -193,7 +192,7 @@ public:
         if (descendants->isEmpty())
             m_descendantsMap.remove(descendantsIterator);
     }
-    
+
     void removeContainingBlock(const RenderBlock& containingBlock)
     {
         auto descendants = m_descendantsMap.take(&containingBlock);
@@ -203,7 +202,7 @@ public:
         for (auto* renderer : *descendants)
             m_containerMap.remove(renderer);
     }
-    
+
     TrackedRendererListHashSet* positionedRenderers(const RenderBlock& containingBlock) const
     {
         return m_descendantsMap.get(&containingBlock);
@@ -212,7 +211,7 @@ public:
 private:
     using DescendantsMap = HashMap<const RenderBlock*, std::unique_ptr<TrackedRendererListHashSet>>;
     using ContainerMap = HashMap<const RenderBox*, const RenderBlock*>;
-    
+
     DescendantsMap m_descendantsMap;
     ContainerMap m_containerMap;
 };
@@ -324,7 +323,7 @@ static void removeBlockFromPercentageDescendantAndContainerMaps(RenderBlock* blo
     std::unique_ptr<TrackedRendererListHashSet> descendantSet = percentHeightDescendantsMap->take(block);
     if (!descendantSet)
         return;
-    
+
     for (auto* descendant : *descendantSet) {
         auto it = percentHeightContainerMap->find(descendant);
         ASSERT(it != percentHeightContainerMap->end());
@@ -377,30 +376,28 @@ void RenderBlock::removePositionedObjectsIfNeeded(const RenderStyle& oldStyle, c
         return;
     }
 
-    // We are no longer the containing block for absolute positioned descendants.
-    if (newStyle.position() == StaticPosition && !willHaveTransform) {
-        // Our positioned descendants will be inserted into a new containing block's positioned objects list during the next layout.
-        removePositionedObjects(nullptr, NewContainingBlock);
-        return;
-    }
-
-    // We are a new containing block.
-    if (oldStyle.position() == StaticPosition && !hadTransform) {
-        // Remove our absolutely positioned descendants from their current containing block.
-        // They will be inserted into our positioned objects list during layout.
-        auto* containingBlock = parent();
-        while (containingBlock && !is<RenderView>(*containingBlock)
-            && (containingBlock->style().position() == StaticPosition || (containingBlock->isInline() && !containingBlock->isReplaced()))) {
-            if (containingBlock->style().position() == RelativePosition && containingBlock->isInline() && !containingBlock->isReplaced()) {
-                containingBlock = containingBlock->containingBlock();
-                break;
+    if (oldStyle && parent() && diff == StyleDifferenceLayout && oldStyle->position() != newStyle.position()) {
+        if (newStyle.position() == StaticPosition)
+            // Clear our positioned objects list. Our absolutely positioned descendants will be
+            // inserted into our containing block's positioned objects list during layout.
+            removePositionedObjects(nullptr, NewContainingBlock);
+        else if (oldStyle->position() == StaticPosition) {
+            // Remove our absolutely positioned descendants from their current containing block.
+            // They will be inserted into our positioned objects list during layout.
+            auto containingBlock = parent();
+            while (containingBlock && !is<RenderView>(*containingBlock)
+                && (containingBlock->style().position() == StaticPosition || (containingBlock->isInline() && !containingBlock->isReplaced()))) {
+                if (containingBlock->style().position() == RelativePosition && containingBlock->isInline() && !containingBlock->isReplaced()) {
+                    containingBlock = containingBlock->containingBlock();
+                    break;
+                }
+                containingBlock = containingBlock->parent();
             }
-            containingBlock = containingBlock->parent();
+
+            if (is<RenderBlock>(*containingBlock))
+                downcast<RenderBlock>(*containingBlock).removePositionedObjects(this, NewContainingBlock);
         }
-        if (containingBlock && is<RenderBlock>(*containingBlock))
-            downcast<RenderBlock>(*containingBlock).removePositionedObjects(this, NewContainingBlock);
     }
-}
 
 void RenderBlock::styleWillChange(StyleDifference diff, const RenderStyle& newStyle)
 {
@@ -455,7 +452,7 @@ void RenderBlock::styleDidChange(StyleDifference diff, const RenderStyle* oldSty
 
     // It's possible for our border/padding to change, but for the overall logical width of the block to
     // end up being the same. We keep track of this change so in layoutBlock, we can know to set relayoutChildren=true.
-    setHasBorderOrPaddingLogicalWidthChanged(oldStyle && diff == StyleDifferenceLayout && needsLayout() && borderOrPaddingLogicalWidthChanged(oldStyle, &newStyle));
+    setShouldForceRelayoutChildren(oldStyle && diff == StyleDifferenceLayout && needsLayout() && borderOrPaddingLogicalWidthChanged(oldStyle, &newStyle));
 }
 
 RenderBlock* RenderBlock::continuationBefore(RenderObject* beforeChild)
@@ -1115,7 +1112,7 @@ bool RenderBlock::recomputeLogicalWidth()
     updateLogicalWidth();
     
     bool hasBorderOrPaddingLogicalWidthChanged = this->hasBorderOrPaddingLogicalWidthChanged();
-    setHasBorderOrPaddingLogicalWidthChanged(false);
+    setShouldForceRelayoutChildren(false);
 
     return oldWidth != logicalWidth() || hasBorderOrPaddingLogicalWidthChanged;
 }
@@ -1203,12 +1200,8 @@ void RenderBlock::addOverflowFromPositionedObjects()
         RenderBox* positionedObject = *it;
         
         // Fixed positioned elements don't contribute to layout overflow, since they don't scroll with the content.
-        if (positionedObject->style().position() != FixedPosition) {
-            LayoutUnit x = positionedObject->x();
-            if (style().shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
-                x -= verticalScrollbarWidth();
-            addOverflowFromChild(positionedObject, LayoutSize(x, positionedObject->y()));
-        }
+        if (positionedObject->style().position() != FixedPosition)
+            addOverflowFromChild(positionedObject, { positionedObject->x(), positionedObject->y() });
     }
 }
 
@@ -2358,6 +2351,8 @@ LayoutUnit RenderBlock::textIndentOffset() const
 LayoutUnit RenderBlock::logicalLeftOffsetForContent(RenderRegion* region) const
 {
     LayoutUnit logicalLeftOffset = style().isHorizontalWritingMode() ? borderLeft() + paddingLeft() : borderTop() + paddingTop();
+    if (style().shouldPlaceBlockDirectionScrollbarOnLeft())
+        logicalLeftOffset += verticalScrollbarWidth();
     if (!region)
         return logicalLeftOffset;
     LayoutRect boxRect = borderBoxRectInRegion(region);
@@ -2367,6 +2362,8 @@ LayoutUnit RenderBlock::logicalLeftOffsetForContent(RenderRegion* region) const
 LayoutUnit RenderBlock::logicalRightOffsetForContent(RenderRegion* region) const
 {
     LayoutUnit logicalRightOffset = style().isHorizontalWritingMode() ? borderLeft() + paddingLeft() : borderTop() + paddingTop();
+    if (style().shouldPlaceBlockDirectionScrollbarOnLeft())
+        logicalRightOffset += verticalScrollbarWidth();
     logicalRightOffset += availableLogicalWidth();
     if (!region)
         return logicalRightOffset;
@@ -3776,7 +3773,7 @@ const char* RenderBlock::renderName() const
     return "RenderBlock";
 }
 
-TextRun RenderBlock::constructTextRun(RenderObject* context, const FontCascade& font, StringView stringView, const RenderStyle& style, ExpansionBehavior expansion, TextRunFlags flags)
+TextRun RenderBlock::constructTextRun(StringView stringView, const RenderStyle& style, ExpansionBehavior expansion, TextRunFlags flags)
 {
     TextDirection textDirection = LTR;
     bool directionalOverride = style.rtlOrdering() == VisualOrder;
@@ -3786,40 +3783,34 @@ TextRun RenderBlock::constructTextRun(RenderObject* context, const FontCascade& 
         if (flags & RespectDirectionOverride)
             directionalOverride |= isOverride(style.unicodeBidi());
     }
-    TextRun run(stringView, 0, 0, expansion, textDirection, directionalOverride);
-    if (font.primaryFont().isSVGFont()) {
-        ASSERT(context); // FIXME: Thread a RenderObject& to this point so we don't have to dereference anything.
-        run.setRenderingContext(SVGTextRunRenderingContext::create(*context));
-    }
-
-    return run;
+    return TextRun(stringView, 0, 0, expansion, textDirection, directionalOverride);
 }
 
-TextRun RenderBlock::constructTextRun(RenderObject* context, const FontCascade& font, const String& string, const RenderStyle& style, ExpansionBehavior expansion, TextRunFlags flags)
+TextRun RenderBlock::constructTextRun(const String& string, const RenderStyle& style, ExpansionBehavior expansion, TextRunFlags flags)
 {
-    return constructTextRun(context, font, StringView(string), style, expansion, flags);
+    return constructTextRun(StringView(string), style, expansion, flags);
 }
 
-TextRun RenderBlock::constructTextRun(RenderObject* context, const FontCascade& font, const RenderText* text, const RenderStyle& style, ExpansionBehavior expansion)
+TextRun RenderBlock::constructTextRun(const RenderText* text, const RenderStyle& style, ExpansionBehavior expansion)
 {
-    return constructTextRun(context, font, text->stringView(), style, expansion);
+    return constructTextRun(text->stringView(), style, expansion);
 }
 
-TextRun RenderBlock::constructTextRun(RenderObject* context, const FontCascade& font, const RenderText* text, unsigned offset, unsigned length, const RenderStyle& style, ExpansionBehavior expansion)
+TextRun RenderBlock::constructTextRun(const RenderText* text, unsigned offset, unsigned length, const RenderStyle& style, ExpansionBehavior expansion)
 {
     unsigned stop = offset + length;
     ASSERT(stop <= text->textLength());
-    return constructTextRun(context, font, text->stringView(offset, stop), style, expansion);
+    return constructTextRun(text->stringView(offset, stop), style, expansion);
 }
 
-TextRun RenderBlock::constructTextRun(RenderObject* context, const FontCascade& font, const LChar* characters, int length, const RenderStyle& style, ExpansionBehavior expansion)
+TextRun RenderBlock::constructTextRun(const LChar* characters, int length, const RenderStyle& style, ExpansionBehavior expansion)
 {
-    return constructTextRun(context, font, StringView(characters, length), style, expansion);
+    return constructTextRun(StringView(characters, length), style, expansion);
 }
 
-TextRun RenderBlock::constructTextRun(RenderObject* context, const FontCascade& font, const UChar* characters, int length, const RenderStyle& style, ExpansionBehavior expansion)
+TextRun RenderBlock::constructTextRun(const UChar* characters, int length, const RenderStyle& style, ExpansionBehavior expansion)
 {
-    return constructTextRun(context, font, StringView(characters, length), style, expansion);
+    return constructTextRun(StringView(characters, length), style, expansion);
 }
 
 RenderBlock* RenderBlock::createAnonymousWithParentRendererAndDisplay(const RenderObject* parent, EDisplay display)

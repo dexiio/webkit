@@ -1784,6 +1784,11 @@ class CppStyleTest(CppStyleTestBase):
             '{\n'
             '}\n',
             '')
+        self.assert_multi_line_lint(
+            '    @try {\n'
+            '    } @catch (NSException *exception) {\n'
+            '    }\n',
+            '')
 
     def test_mismatching_spaces_in_parens(self):
         self.assert_lint('if (foo ) {', 'Extra space before ) in if'
@@ -4256,6 +4261,19 @@ class WebKitStyleTest(CppStyleTestBase):
         self.assert_multi_line_lint(
             'WTF_MAKE_NONCOPYABLE(ClassName); WTF_MAKE_FAST_ALLOCATED;\n',
             '')
+        self.assert_multi_line_lint(
+            '#define MyMacro(name, status) \\\n'
+            '    if (strstr(arg, #name) { \\\n'
+            '        name##_ = !status; \\\n'
+            '        continue; \\\n'
+            '    }\n',
+            '')
+        self.assert_multi_line_lint(
+            '#define MyMacro(name, status) \\\n'
+            '    if (strstr(arg, #name) \\\n'
+            '        name##_ = !status; \\\n'
+            '        continue;\n',
+            'Multi line control clauses should use braces.  [whitespace/braces] [4]')
         self.assert_multi_line_lint(
             'if (condition) {\n'
             '    doSomething();\n'

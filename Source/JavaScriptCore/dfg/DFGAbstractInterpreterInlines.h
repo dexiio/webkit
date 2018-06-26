@@ -141,7 +141,22 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         setBuiltInConstant(node, *node->constant());
         break;
     }
-        
+
+    case LazyJSConstant: {
+        LazyJSValue value = node->lazyJSValue();
+        switch (value.kind()) {
+        case LazyJSValue::KnownValue:
+            setConstant(node, value.value()->value());
+            break;
+        case LazyJSValue::SingleCharacterString:
+        case LazyJSValue::KnownStringImpl:
+        case LazyJSValue::NewStringImpl:
+            forNode(node).setType(m_graph, SpecString);
+            break;
+        }
+        break;
+    }
+
     case Identity: {
         forNode(node) = forNode(node->child1());
         if (forNode(node).value())
@@ -284,6 +299,14 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case UInt32ToNumber: {
         JSValue child = forNode(node->child1()).value();
         if (doesOverflow(node->arithMode())) {
+            if (enableInt52()) {
+                if (child && child.isMachineInt()) {
+                    setConstant(node, jsNumber(child.asMachineInt()));
+                    break;
+                }
+                forNode(node).setType(SpecMachineInt);
+                break;
+            }
             if (child && child.isInt32()) {
                 uint32_t value = child.asInt32();
                 setConstant(node, jsNumber(value));
@@ -835,7 +858,8 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
 
     case ArithRound:
     case ArithFloor:
-    case ArithCeil: {
+    case ArithCeil:
+    case ArithTrunc: {
         JSValue operand = forNode(node->child1()).value();
         if (operand && operand.isNumber()) {
             double roundedValue = 0;
@@ -843,9 +867,11 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                 roundedValue = jsRound(operand.asNumber());
             else if (node->op() == ArithFloor)
                 roundedValue = floor(operand.asNumber());
-            else {
-                ASSERT(node->op() == ArithCeil);
+            else if (node->op() == ArithCeil)
                 roundedValue = ceil(operand.asNumber());
+            else {
+                ASSERT(node->op() == ArithTrunc);
+                roundedValue = trunc(operand.asNumber());
             }
 
             if (producesInteger(node->arithRoundingMode())) {
@@ -1155,7 +1181,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
 
         // FIXME: We could use the masquerades-as-undefined watchpoint here.
         // https://bugs.webkit.org/show_bug.cgi?id=144456
-        if (!(abstractChild.m_type & ~(SpecObject - SpecObjectOther))) {
+        if (!(abstractChild.m_type & ~(SpecObject - SpecObjectOther - SpecFunction))) {
             setConstant(node, *m_graph.freeze(vm->smallStrings.objectString()));
             break;
         }
@@ -1554,10 +1580,32 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     }
             
     case RegExpExec:
-        forNode(node).makeHeapTop();
+        if (node->child2().useKind() == RegExpObjectUse
+            && node->child3().useKind() == StringUse) {
+            // This doesn't clobber the world since there are no conversions to perform.
+        } else
+            clobberWorld(node->origin.semantic, clobberLimit);
+        if (JSValue globalObjectValue = forNode(node->child1()).m_value) {
+            if (JSGlobalObject* globalObject = jsDynamicCast<JSGlobalObject*>(globalObjectValue)) {
+                if (!globalObject->isHavingABadTime()) {
+                    m_graph.watchpoints().addLazily(globalObject->havingABadTimeWatchpoint());
+                    Structure* structure = globalObject->regExpMatchesArrayStructure();
+                    m_graph.registerStructure(structure);
+                    forNode(node).set(m_graph, structure);
+                    forNode(node).merge(SpecOther);
+                    break;
+                }
+            }
+        }
+        forNode(node).setType(m_graph, SpecOther | SpecArray);
         break;
 
     case RegExpTest:
+        if (node->child2().useKind() == RegExpObjectUse
+            && node->child3().useKind() == StringUse) {
+            // This doesn't clobber the world since there are no conversions to perform.
+        } else
+            clobberWorld(node->origin.semantic, clobberLimit);
         forNode(node).setType(SpecBoolean);
         break;
             
@@ -1703,7 +1751,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             m_graph.globalObjectFor(node->origin.semantic)->typedArrayStructure(
                 node->typedArrayType()));
         break;
-        
+
     case NewRegexp:
         forNode(node).set(m_graph, m_graph.globalObjectFor(node->origin.semantic)->regExpStructure());
         break;
@@ -1785,12 +1833,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
         
     case CreateClonedArguments:
-        forNode(node).setType(m_graph, SpecObjectOther);
-        break;
-            
-    case NewArrowFunction:
-        forNode(node).set(
-            m_graph, m_codeBlock->globalObjectFor(node->origin.semantic)->functionStructure());
+        forNode(node).set(m_graph, m_codeBlock->globalObjectFor(node->origin.semantic)->clonedArgumentsStructure());
         break;
 
     case NewGeneratorFunction:
@@ -1872,6 +1915,33 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
     }
 
+    case GetGlobalObject: {
+        JSValue child = forNode(node->child1()).value();
+        if (child) {
+            setConstant(node, *m_graph.freeze(JSValue(asObject(child)->globalObject())));
+            break;
+        }
+
+        if (forNode(node->child1()).m_structure.isFinite()) {
+            JSGlobalObject* globalObject = nullptr;
+            bool ok = true;
+            forNode(node->child1()).m_structure.forEach(
+                [&] (Structure* structure) {
+                    if (!globalObject)
+                        globalObject = structure->globalObject();
+                    else if (globalObject != structure->globalObject())
+                        ok = false;
+                });
+            if (globalObject && ok) {
+                setConstant(node, *m_graph.freeze(JSValue(globalObject)));
+                break;
+            }
+        }
+
+        forNode(node).setType(m_graph, SpecObjectOther);
+        break;
+    }
+
     case GetClosureVar:
         if (JSValue value = m_graph.tryGetConstantClosureVar(forNode(node->child1()), node->scopeOffset())) {
             setConstant(node, *m_graph.freeze(value));
@@ -1882,14 +1952,28 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             
     case PutClosureVar:
         break;
-        
+
+    case GetRegExpObjectLastIndex:
+        forNode(node).makeHeapTop();
+        break;
+
+    case SetRegExpObjectLastIndex:
+    case RecordRegExpCachedResult:
+        break;
+
     case GetFromArguments:
         forNode(node).makeHeapTop();
         break;
         
     case PutToArguments:
         break;
-            
+
+    case TryGetById:
+        // FIXME: This should constant fold at least as well as the normal GetById case.
+        // https://bugs.webkit.org/show_bug.cgi?id=156422
+        forNode(node).makeHeapTop();
+        break;
+
     case GetById:
     case GetByIdFlush: {
         if (!node->prediction()) {
@@ -2023,7 +2107,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         }
         break;
     case GetButterfly:
-    case GetButterflyReadOnly:
     case AllocatePropertyStorage:
     case ReallocatePropertyStorage:
         forNode(node).clear(); // The result is not a JS value.
@@ -2552,9 +2635,10 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
 
     case CheckWatchdogTimer:
+    case LogShadowChickenPrologue:
+    case LogShadowChickenTail:
         break;
 
-    case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
     case ProfileType:
@@ -2583,13 +2667,17 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
     }
 
+    case SetFunctionName: {
+        clobberWorld(node->origin.semantic, clobberLimit);
+        break;
+    }
+
     case StoreBarrier: {
         filter(node->child1(), SpecCell);
         break;
     }
 
     case CheckTierUpAndOSREnter:
-    case CheckTierUpWithNestedTriggerAndOSREnter:
     case LoopHint:
     case ZombieHint:
     case ExitOK:
@@ -2642,7 +2730,6 @@ template<typename Functor>
 void AbstractInterpreter<AbstractStateType>::forAllValues(
     unsigned clobberLimit, Functor& functor)
 {
-    SamplingRegion samplingRegion("DFG AI For All Values");
     if (clobberLimit >= m_state.block()->size())
         clobberLimit = m_state.block()->size();
     else
@@ -2665,7 +2752,6 @@ void AbstractInterpreter<AbstractStateType>::forAllValues(
 template<typename AbstractStateType>
 void AbstractInterpreter<AbstractStateType>::clobberStructures(unsigned clobberLimit)
 {
-    SamplingRegion samplingRegion("DFG AI Clobber Structures");
     forAllValues(clobberLimit, AbstractValue::clobberStructuresFor);
     setDidClobber();
 }

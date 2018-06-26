@@ -26,31 +26,40 @@
 
 WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView extends WebInspector.ContentView
 {
-    constructor(recording, extraArguments)
+    constructor(recording)
     {
-        console.assert(extraArguments);
-        console.assert(extraArguments.timelineSidebarPanel instanceof WebInspector.TimelineSidebarPanel);
-
         super(recording);
 
         this._recording = recording;
-        this._timelineSidebarPanel = extraArguments.timelineSidebarPanel;
 
         this.element.classList.add("timeline-recording");
 
-        this._timelineOverview = new WebInspector.TimelineOverview(this._recording);
+        this._timelineOverview = new WebInspector.TimelineOverview(this._recording, this);
         this._timelineOverview.addEventListener(WebInspector.TimelineOverview.Event.TimeRangeSelectionChanged, this._timeRangeSelectionChanged, this);
         this._timelineOverview.addEventListener(WebInspector.TimelineOverview.Event.RecordSelected, this._recordSelected, this);
+        this._timelineOverview.addEventListener(WebInspector.TimelineOverview.Event.TimelineSelected, this._timelineSelected, this);
+        this._timelineOverview.addEventListener(WebInspector.TimelineOverview.Event.EditingInstrumentsDidChange, this._editingInstrumentsDidChange, this);
         this.addSubview(this._timelineOverview);
 
-        this._contentViewContainer = new WebInspector.ContentViewContainer;
-        this._contentViewContainer.addEventListener(WebInspector.ContentViewContainer.Event.CurrentContentViewDidChange, this._currentContentViewDidChange, this);
-        this.addSubview(this._contentViewContainer);
+        const disableBackForward = true;
+        const disableFindBanner = true;
+        this._timelineContentBrowser = new WebInspector.ContentBrowser(null, this, disableBackForward, disableFindBanner);
+        this._timelineContentBrowser.addEventListener(WebInspector.ContentBrowser.Event.CurrentContentViewDidChange, this._currentContentViewDidChange, this);
+
+        this._entireRecordingPathComponent = this._createTimelineRangePathComponent(WebInspector.UIString("Entire Recording"));
+        this._timelineSelectionPathComponent = this._createTimelineRangePathComponent();
+        this._timelineSelectionPathComponent.previousSibling = this._entireRecordingPathComponent;
+        this._selectedTimeRangePathComponent = this._entireRecordingPathComponent;
+
+        this._filterBarNavigationItem = new WebInspector.FilterBarNavigationItem;
+        this._filterBarNavigationItem.filterBar.placeholder = WebInspector.UIString("Filter Records");
+        this._timelineContentBrowser.navigationBar.addNavigationItem(this._filterBarNavigationItem);
+        this.addSubview(this._timelineContentBrowser);
 
         this._clearTimelineNavigationItem = new WebInspector.ButtonNavigationItem("clear-timeline", WebInspector.UIString("Clear Timeline"), "Images/NavigationItemTrash.svg", 15, 15);
         this._clearTimelineNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._clearTimeline, this);
 
-        this._overviewTimelineView = new WebInspector.OverviewTimelineView(recording, {timelineSidebarPanel: this._timelineSidebarPanel});
+        this._overviewTimelineView = new WebInspector.OverviewTimelineView(recording);
         this._overviewTimelineView.secondsPerPixel = this._timelineOverview.secondsPerPixel;
 
         this._timelineViewMap = new Map;
@@ -86,7 +95,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
 
     showOverviewTimelineView()
     {
-        this._contentViewContainer.showContentView(this._overviewTimelineView);
+        this._timelineContentBrowser.showContentView(this._overviewTimelineView);
     }
 
     showTimelineViewForTimeline(timeline)
@@ -96,7 +105,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         if (!this._timelineViewMap.has(timeline))
             return;
 
-        this._contentViewContainer.showContentView(this._timelineViewMap.get(timeline));
+        this._timelineContentBrowser.showContentView(this._timelineViewMap.get(timeline));
     }
 
     get supportsSplitContentBrowser()
@@ -107,21 +116,23 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
 
     get selectionPathComponents()
     {
-        if (!this._contentViewContainer.currentContentView)
+        if (!this._timelineContentBrowser.currentContentView)
             return [];
 
-        var pathComponents = this._contentViewContainer.currentContentView.selectionPathComponents || [];
-        var representedObject = this._contentViewContainer.currentContentView.representedObject;
+        let pathComponents = [];
+        let representedObject = this._timelineContentBrowser.currentContentView.representedObject;
         if (representedObject instanceof WebInspector.Timeline)
-            pathComponents.unshift(this._pathComponentMap.get(representedObject));
+            pathComponents.push(this._pathComponentMap.get(representedObject));
+
+        pathComponents.push(this._selectedTimeRangePathComponent);
         return pathComponents;
     }
 
     get supplementalRepresentedObjects()
     {
-        if (!this._contentViewContainer.currentContentView)
+        if (!this._timelineContentBrowser.currentContentView)
             return [];
-        return this._contentViewContainer.currentContentView.supplementalRepresentedObjects;
+        return this._timelineContentBrowser.currentContentView.supplementalRepresentedObjects;
     }
 
     get navigationItems()
@@ -131,37 +142,31 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
 
     get handleCopyEvent()
     {
-        var currentContentView = this._contentViewContainer.currentContentView;
+        let currentContentView = this._timelineContentBrowser.currentContentView;
         return currentContentView && typeof currentContentView.handleCopyEvent === "function" ? currentContentView.handleCopyEvent.bind(currentContentView) : null;
     }
 
     get supportsSave()
     {
-        var currentContentView = this._contentViewContainer.currentContentView;
+        let currentContentView = this._timelineContentBrowser.currentContentView;
         return currentContentView && currentContentView.supportsSave;
     }
 
     get saveData()
     {
-        var currentContentView = this._contentViewContainer.currentContentView;
+        let currentContentView = this._timelineContentBrowser.currentContentView;
         return currentContentView && currentContentView.saveData || null;
     }
 
     get currentTimelineView()
     {
-        var contentView = this._contentViewContainer.currentContentView;
-        return (contentView instanceof WebInspector.TimelineView) ? contentView : null;
-    }
-
-    get timelineOverviewHeight()
-    {
-        return this._timelineOverview.height;
+        return this._timelineContentBrowser.currentContentView;
     }
 
     shown()
     {
         this._timelineOverview.shown();
-        this._contentViewContainer.shown();
+        this._timelineContentBrowser.shown();
         this._clearTimelineNavigationItem.enabled = !this._recording.readonly && !isNaN(this._recording.startTime);
 
         this._currentContentViewDidChange();
@@ -173,7 +178,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
     hidden()
     {
         this._timelineOverview.hidden();
-        this._contentViewContainer.hidden();
+        this._timelineContentBrowser.hidden();
 
         if (this._updating)
             this._stopUpdatingCurrentTime();
@@ -181,7 +186,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
 
     closed()
     {
-        this._contentViewContainer.closeAllContentViews();
+        this._timelineContentBrowser.contentViewContainer.closeAllContentViews();
 
         this._recording.removeEventListener(null, null, this);
 
@@ -192,42 +197,22 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
 
     canGoBack()
     {
-        return this._contentViewContainer.canGoBack();
+        return this._timelineContentBrowser.canGoBack();
     }
 
     canGoForward()
     {
-        return this._contentViewContainer.canGoForward();
+        return this._timelineContentBrowser.canGoForward();
     }
 
     goBack()
     {
-        this._contentViewContainer.goBack();
+        this._timelineContentBrowser.goBack();
     }
 
     goForward()
     {
-        this._contentViewContainer.goForward();
-    }
-
-    saveToCookie(cookie)
-    {
-        cookie.type = WebInspector.ContentViewCookieType.Timelines;
-
-        var currentContentView = this._contentViewContainer.currentContentView;
-        if (!currentContentView || currentContentView === this._overviewTimelineView)
-            cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey] = WebInspector.TimelineRecordingContentView.OverviewTimelineViewCookieValue;
-        else if (currentContentView.representedObject instanceof WebInspector.Timeline)
-            cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey] = this.currentTimelineView.representedObject.type;
-    }
-
-    restoreFromCookie(cookie)
-    {
-        var timelineType = cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey];
-        if (timelineType === WebInspector.TimelineRecordingContentView.OverviewTimelineViewCookieValue)
-            this.showOverviewTimelineView();
-        else
-            this.showTimelineViewForTimeline(this.representedObject.timelines.get(timelineType));
+        this._timelineContentBrowser.goForward();
     }
 
     filterDidChange()
@@ -318,6 +303,46 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         return true;
     }
 
+    // ContentBrowser delegate
+
+    contentBrowserTreeElementForRepresentedObject(contentBrowser, representedObject)
+    {
+        if (!(representedObject instanceof WebInspector.Timeline) && !(representedObject instanceof WebInspector.TimelineRecording))
+            return null;
+
+        let iconClassName;
+        let title;
+        if (representedObject instanceof WebInspector.Timeline) {
+            iconClassName = WebInspector.TimelineTabContentView.iconClassNameForTimelineType(representedObject.type);
+            title = WebInspector.UIString("Details");
+        } else {
+            iconClassName = WebInspector.TimelineTabContentView.StopwatchIconStyleClass;
+            title = WebInspector.UIString("Overview");
+        }
+
+        const hasChildren = false;
+        return new WebInspector.GeneralTreeElement(iconClassName, title, representedObject, hasChildren);
+    }
+
+    // TimelineOverview delegate
+
+    timelineOverviewUserSelectedRecord(timelineOverview, timelineRecord)
+    {
+        let timelineViewForRecord = null;
+        for (let timelineView of this._timelineViewMap.values()) {
+            if (timelineView.representedObject.type === timelineRecord.type) {
+                timelineViewForRecord = timelineView;
+                break;
+            }
+        }
+
+        if (!timelineViewForRecord)
+            return;
+
+        this._timelineContentBrowser.showContentView(timelineViewForRecord);
+        timelineViewForRecord.userSelectedRecordFromOverview(timelineRecord);
+    }
+
     // Private
 
     _currentContentViewDidChange(event)
@@ -330,29 +355,48 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
             newViewMode = WebInspector.TimelineOverview.ViewMode.Timelines;
 
         this._timelineOverview.viewMode = newViewMode;
+        this._updateTimelineOverviewHeight();
 
         if (timelineView) {
-            this._timelineSidebarPanel.contentTreeOutline = timelineView.navigationSidebarTreeOutline;
-            this._timelineSidebarPanel.contentTreeOutlineLabel = timelineView.navigationSidebarTreeOutlineLabel;
-            this._timelineSidebarPanel.contentTreeOutlineScopeBar = timelineView.navigationSidebarTreeOutlineScopeBar;
-
-            timelineView.startTime = this._timelineOverview.selectionStartTime;
-            timelineView.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
+            this._updateTimelineViewSelection(timelineView);
             timelineView.currentTime = this._currentTime;
+
+            let timeline = null;
+            if (timelineView.representedObject instanceof WebInspector.Timeline)
+                timeline = timelineView.representedObject;
+
+            this._timelineOverview.selectedTimeline = timeline;
         }
 
         this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
         this.dispatchEventToListeners(WebInspector.ContentView.Event.NavigationItemsDidChange);
     }
 
-    _pathComponentSelected(event)
+    _timelinePathComponentSelected(event)
     {
-        this._timelineSidebarPanel.showTimelineViewForTimeline(event.data.pathComponent.representedObject);
+        let selectedTimeline = event.data.pathComponent.representedObject;
+        this.showTimelineViewForTimeline(selectedTimeline);
+    }
+
+    _timeRangePathComponentSelected(event)
+    {
+        let selectedPathComponent = event.data.pathComponent;
+        if (selectedPathComponent === this._selectedTimeRangePathComponent)
+            return;
+
+        let timelineRuler = this._timelineOverview.timelineRuler
+        if (selectedPathComponent === this._entireRecordingPathComponent)
+            timelineRuler.selectEntireRange();
+        else {
+            let timelineRange = selectedPathComponent.representedObject;
+            timelineRuler.selectionStartTime = timelineRuler.zeroTime + timelineRange.startValue;
+            timelineRuler.selectionEndTime = timelineRuler.zeroTime + timelineRange.endValue;
+        }
     }
 
     _contentViewSelectionPathComponentDidChange(event)
     {
-        if (event.target !== this._contentViewContainer.currentContentView)
+        if (event.target !== this._timelineContentBrowser.currentContentView)
             return;
 
         this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
@@ -367,7 +411,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
 
     _contentViewSupplementalRepresentedObjectsDidChange(event)
     {
-        if (event.target !== this._contentViewContainer.currentContentView)
+        if (event.target !== this._timelineContentBrowser.currentContentView)
             return;
         this.dispatchEventToListeners(WebInspector.ContentView.Event.SupplementalRepresentedObjectsDidChange);
     }
@@ -406,8 +450,12 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         if (this._startTimeNeedsReset && !isNaN(startTime)) {
             this._timelineOverview.startTime = startTime;
             this._overviewTimelineView.zeroTime = startTime;
-            for (var timelineView of this._timelineViewMap.values())
+            for (var timelineView of this._timelineViewMap.values()) {
+                if (timelineView.representedObject.type === WebInspector.TimelineRecord.Type.RenderingFrame)
+                    continue;
+
                 timelineView.zeroTime = startTime;
+            }
 
             this._startTimeNeedsReset = false;
         }
@@ -419,7 +467,11 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         if (this.currentTimelineView)
             this.currentTimelineView.currentTime = currentTime;
 
-        this._timelineSidebarPanel.updateFilter();
+        if (this._timelineOverview.timelineRuler.entireRangeSelected)
+            this._updateTimelineViewSelection(this._overviewTimelineView);
+
+        // Filter records on new recording times.
+        // FIXME: <https://webkit.org/b/154924> Web Inspector: hook up grid row filtering in the new Timelines UI
 
         // Force a layout now since we are already in an animation frame and don't need to delay it until the next.
         this._timelineOverview.updateLayoutIfNeeded();
@@ -526,11 +578,15 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
 
     _updateTimelineOverviewHeight()
     {
-        const rulerHeight = 29;
-        
-        let styleValue = (rulerHeight + this.timelineOverviewHeight) + "px";
-        this._timelineOverview.element.style.height = styleValue;
-        this._contentViewContainer.element.style.top = styleValue;
+        if (this._timelineOverview.editingInstruments)
+            this._timelineOverview.element.style.height = "";
+        else {
+            const rulerHeight = 23;
+
+            let styleValue = (rulerHeight + this._timelineOverview.height) + "px";
+            this._timelineOverview.element.style.height = styleValue;
+            this._timelineContentBrowser.element.style.top = styleValue;
+        }
     }
 
     _instrumentAdded(instrumentOrEvent)
@@ -541,14 +597,14 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         let timeline = this._recording.timelineForInstrument(instrument);
         console.assert(!this._timelineViewMap.has(timeline), timeline);
 
-        this._timelineViewMap.set(timeline, WebInspector.ContentView.createFromRepresentedObject(timeline, {timelineSidebarPanel: this._timelineSidebarPanel}));
+        this._timelineViewMap.set(timeline, WebInspector.ContentView.createFromRepresentedObject(timeline, {recording: this._recording}));
         if (timeline.type === WebInspector.TimelineRecord.Type.RenderingFrame)
             this._renderingFrameTimeline = timeline;
 
-        let displayName = WebInspector.TimelineTabContentView.displayNameForTimeline(timeline);
-        let iconClassName = WebInspector.TimelineTabContentView.iconClassNameForTimeline(timeline);
+        let displayName = WebInspector.TimelineTabContentView.displayNameForTimelineType(timeline.type);
+        let iconClassName = WebInspector.TimelineTabContentView.iconClassNameForTimelineType(timeline.type);
         let pathComponent = new WebInspector.HierarchicalPathComponent(displayName, iconClassName, timeline);
-        pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
+        pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._timelinePathComponentSelected, this);
         this._pathComponentMap.set(timeline, pathComponent);
 
         this._timelineCountChanged();
@@ -621,12 +677,27 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
 
     _timeRangeSelectionChanged(event)
     {
-        if (this.currentTimelineView) {
-            this.currentTimelineView.startTime = this._timelineOverview.selectionStartTime;
-            this.currentTimelineView.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
+        console.assert(this.currentTimelineView);
+        if (!this.currentTimelineView)
+            return;
 
-            if (this.currentTimelineView.representedObject.type === WebInspector.TimelineRecord.Type.RenderingFrame)
-                this._updateFrameSelection();
+        this._updateTimelineViewSelection(this.currentTimelineView);
+
+        let selectedPathComponent;
+        if (this._timelineOverview.timelineRuler.entireRangeSelected)
+            selectedPathComponent = this._entireRecordingPathComponent;
+        else {
+            let timelineRange = this._timelineSelectionPathComponent.representedObject;
+            timelineRange.startValue = this.currentTimelineView.startTime - this.currentTimelineView.zeroTime;
+            timelineRange.endValue = this.currentTimelineView.endTime - this.currentTimelineView.zeroTime;
+
+            this._updateTimeRangePathComponents();
+            selectedPathComponent = this._timelineSelectionPathComponent;
+        }
+
+        if (this._selectedTimeRangePathComponent !== selectedPathComponent) {
+            this._selectedTimeRangePathComponent = selectedPathComponent;
+            this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
         }
 
         // Delay until the next frame to stay in sync with the current timeline view's time-based layout changes.
@@ -634,7 +705,8 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
             var selectedTreeElement = this.currentTimelineView && this.currentTimelineView.navigationSidebarTreeOutline ? this.currentTimelineView.navigationSidebarTreeOutline.selectedTreeElement : null;
             var selectionWasHidden = selectedTreeElement && selectedTreeElement.hidden;
 
-            this._timelineSidebarPanel.updateFilter();
+            // Filter records on new timeline selection.
+            // FIXME: <https://webkit.org/b/154924> Web Inspector: hook up grid row filtering in the new Timelines UI
 
             if (selectedTreeElement && selectedTreeElement.hidden !== selectionWasHidden)
                 this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
@@ -667,17 +739,77 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         treeElement.revealAndSelect(false, false, false, true);
     }
 
-    _updateFrameSelection()
+    _timelineSelected()
     {
-        console.assert(this._renderingFrameTimeline);
-        if (!this._renderingFrameTimeline)
-            return;
+        let timeline = this._timelineOverview.selectedTimeline;
+        if (timeline)
+            this.showTimelineViewForTimeline(timeline);
+        else
+            this.showOverviewTimelineView();
+    }
 
-        let startIndex = this._timelineOverview.selectionStartTime;
-        let endIndex = startIndex + this._timelineOverview.selectionDuration - 1;
-        this._timelineSidebarPanel.updateFrameSelection(startIndex, endIndex);
+    _updateTimeRangePathComponents()
+    {
+        let timelineRange = this._timelineSelectionPathComponent.representedObject;
+        let startValue = timelineRange.startValue;
+        let endValue = timelineRange.endValue;
+        if (isNaN(startValue) || isNaN(endValue)) {
+            this._entireRecordingPathComponent.nextSibling = null;
+            return;
+        }
+
+        this._entireRecordingPathComponent.nextSibling = this._timelineSelectionPathComponent;
+
+        let displayName;
+        if (this._timelineOverview.viewMode === WebInspector.TimelineOverview.ViewMode.Timelines) {
+            let selectionStart = Number.secondsToString(startValue, true);
+            let selectionEnd = Number.secondsToString(endValue, true);
+            displayName = WebInspector.UIString("%s \u2013 %s").format(selectionStart, selectionEnd);
+        } else {
+            startValue += 1; // Convert index to frame number.
+            if (startValue === endValue)
+                displayName = WebInspector.UIString("Frame %d").format(startValue);
+            else
+                displayName = WebInspector.UIString("Frames %d \u2013 %d").format(startValue, endValue);
+        }
+
+        this._timelineSelectionPathComponent.displayName = displayName;
+        this._timelineSelectionPathComponent.title = displayName;
+    }
+
+    _createTimelineRangePathComponent(title)
+    {
+        let range = new WebInspector.TimelineRange(NaN, NaN);
+        let pathComponent = new WebInspector.HierarchicalPathComponent(title || enDash, "time-icon", range);
+        pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._timeRangePathComponentSelected, this);
+
+        return pathComponent;
+    }
+
+    _updateTimelineViewSelection(timelineView)
+    {
+        let timelineRuler = this._timelineOverview.timelineRuler;
+        let entireRangeSelected = timelineRuler.entireRangeSelected;
+        let endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
+
+        if (entireRangeSelected) {
+            // Clamp selection to the end of the recording (with padding), so that OverviewTimelineView
+            // displays an autosized graph without a lot of horizontal white space or tiny graph bars.
+            if (isNaN(this._recording.endTime))
+                endTime = this._currentTime;
+            else
+                endTime = Math.min(endTime, this._recording.endTime + timelineRuler.minimumSelectionDuration);
+        }
+
+        timelineView.startTime = this._timelineOverview.selectionStartTime;
+        timelineView.endTime = endTime;
+    }
+
+    _editingInstrumentsDidChange(event)
+    {
+        let editingInstruments = this._timelineOverview.editingInstruments;
+        this.element.classList.toggle(WebInspector.TimelineOverview.EditInstrumentsStyleClassName, editingInstruments);
+
+        this._updateTimelineOverviewHeight();
     }
 };
-
-WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey = "timeline-recording-content-view-selected-timeline-type";
-WebInspector.TimelineRecordingContentView.OverviewTimelineViewCookieValue = "timeline-recording-content-view-overview-timeline-view";

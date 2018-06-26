@@ -76,6 +76,10 @@
 #include <QVariant>
 #endif
 
+#if PLATFORM(MAC)
+#include "ScrollbarThemeMac.h"
+#endif
+
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -414,7 +418,7 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
         }
     }
 #endif
-    
+
     writeDebugInfo(ts, o, behavior);
 }
 
@@ -642,6 +646,14 @@ static void write(TextStream& ts, const RenderLayer& layer, const LayoutRect& la
             ts << " scrollWidth " << layer.scrollWidth();
         if (layer.renderBox() && roundToInt(layer.renderBox()->clientHeight()) != layer.scrollHeight())
             ts << " scrollHeight " << layer.scrollHeight();
+#if PLATFORM(MAC)
+        ScrollbarTheme& scrollbarTheme = ScrollbarTheme::theme();
+        if (!scrollbarTheme.isMockTheme() && layer.hasVerticalScrollbar()) {
+            ScrollbarThemeMac& macTheme = *static_cast<ScrollbarThemeMac*>(&scrollbarTheme);
+            if (macTheme.isLayoutDirectionRTL(*layer.verticalScrollbar()))
+                ts << " scrollbarHasRTLLayoutDirection";
+        }
+#endif
     }
 
     if (paintPhase == LayerPaintPhaseBackground)

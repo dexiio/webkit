@@ -1,25 +1,23 @@
-2016-10-25  Konstantin Tokarev  <annulen@yandex.ru>
+2016-04-11  Fujii Hironori  <Hironori.Fujii@jp.sony.com>
 
-        [cmake] Check if jscLib and WebKitGUID targets exist before using them
-        https://bugs.webkit.org/show_bug.cgi?id=163945
+        [CMake] Make FOLDER property INHERITED
+        https://bugs.webkit.org/show_bug.cgi?id=156460
 
-        Reviewed by Alex Christensen.
-
-        Currently these targets are used under WIN32 condition, however they
-        are defined in PlatformWin.cmake, causing CMake warnings if port
-        supports WIN32 but does not use PlatformWin.cmake
+        Reviewed by Brent Fulgham.
 
         * CMakeLists.txt:
+        * PlatformWin.cmake:
+        Set FOLDER property as a directory property not a target property
 
-2016-04-25  Per Arne Vollan  <peavo@outlook.com>
+2016-04-08  Alex Christensen  <achristensen@webkit.org>
 
-        [Win][IndexedDB] Fix build errors.
-        https://bugs.webkit.org/show_bug.cgi?id=156713
+        Progress towards running CMake WebKit2 on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=156426
 
-        Reviewed by Alex Christensen.
+        Reviewed by Tim Horton.
 
-        Fix compile and link errors when building with IndexedDB enabled.
-
+        * CMakeLists.txt:
+        * PlatformMac.cmake:
         * PlatformWin.cmake:
 
 2016-04-08  Konstantin Tokarev  <annulen@yandex.ru>
@@ -30,6 +28,110 @@
         Reviewed by Brent Fulgham.
 
         * CMakeLists.txt:
+
+2016-04-07  Fujii Hironori  <Hironori.Fujii@jp.sony.com>
+
+        [CMake][Win] Generating autoversion.h of WebKitGUID is triggered again and again
+        https://bugs.webkit.org/show_bug.cgi?id=156332
+
+        Reviewed by Brent Fulgham.
+
+        * PlatformWin.cmake:
+        Correct the output path of autoversion.h.
+
+2016-04-06  Alex Christensen  <achristensen@webkit.org>
+
+        Fix CMake DumpRenderTree
+        https://bugs.webkit.org/show_bug.cgi?id=156305
+
+        Reviewed by Daniel Bates.
+
+        * PlatformMac.cmake:
+
+2016-04-05  Alex Christensen  <achristensen@webkit.org>
+
+        Make CMake-generated binaries on Mac able to run
+        https://bugs.webkit.org/show_bug.cgi?id=156268
+
+        Reviewed by Daniel Bates.
+
+        * CMakeLists.txt:
+
+2016-04-01  Alex Christensen  <achristensen@webkit.org>
+
+        Compile DumpRenderTree with CMake on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=156088
+
+        Reviewed by Brent Fulgham.
+
+        * PlatformMac.cmake:
+
+2016-03-28  Alex Christensen  <achristensen@webkit.org>
+
+        Fix Ninja build on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=151399
+
+        Reviewed by Darin Adler.
+
+        * PlatformWin.cmake:
+
+2016-03-05  Chris Dumez  <cdumez@apple.com>
+
+        Consolidate RuntimeApplicationChecks and RuntimeApplicationChecksIOS
+        https://bugs.webkit.org/show_bug.cgi?id=155035
+
+        Reviewed by Darin Adler.
+
+        Update runtime application checks.
+
+        * WebCoreSupport/WebResourceLoadScheduler.cpp:
+        (WebResourceLoadScheduler::servePendingRequests):
+
+2016-03-04  Alex Christensen  <achristensen@webkit.org>
+
+        Remove vcxproj build system
+        https://bugs.webkit.org/show_bug.cgi?id=154388
+
+        Rubber-stamped by Brent Fulgham.
+
+        * WebKit.vcxproj/Interfaces/FixMIDLHeaders.pl: Removed.
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj: Removed.
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj.filters: Removed.
+        * WebKit.vcxproj/Interfaces/InterfacesCommon.props: Removed.
+        * WebKit.vcxproj/Interfaces/InterfacesDebug.props: Removed.
+        * WebKit.vcxproj/Interfaces/InterfacesDebugWinCairo.props: Removed.
+        * WebKit.vcxproj/Interfaces/InterfacesPostBuild.cmd: Removed.
+        * WebKit.vcxproj/Interfaces/InterfacesPreBuild.cmd: Removed.
+        * WebKit.vcxproj/Interfaces/InterfacesProduction.props: Removed.
+        * WebKit.vcxproj/Interfaces/InterfacesRelease.props: Removed.
+        * WebKit.vcxproj/Interfaces/InterfacesReleaseWinCairo.props: Removed.
+        * WebKit.vcxproj/WebKit.sln: Removed.
+        * WebKit.vcxproj/WebKit.submit.sln: Removed.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj: Removed.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters: Removed.
+        * WebKit.vcxproj/WebKit/WebKitANGLE.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitApple.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitCFLite.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitCommon.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitDebug.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitDebugWinCairo.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitDirectX.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitPostBuild.cmd: Removed.
+        * WebKit.vcxproj/WebKit/WebKitPreBuild.cmd: Removed.
+        * WebKit.vcxproj/WebKit/WebKitPreLink.cmd: Removed.
+        * WebKit.vcxproj/WebKit/WebKitProduction.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitRelease.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitReleaseWinCairo.props: Removed.
+        * WebKit.vcxproj/WebKit/WebKitVersion.cmd: Removed.
+
+2016-03-01  Alex Christensen  <achristensen@webkit.org>
+
+        Reduce size of internal windows build output
+        https://bugs.webkit.org/show_bug.cgi?id=154763
+
+        Reviewed by Brent Fulgham.
+
+        * WebKit.vcxproj/WebKit.proj:
 
 2016-02-26  Konstantin Tokarev  <annulen@yandex.ru>
 
@@ -45,15 +147,6 @@
         * PlatformMac.cmake:
         * PlatformWin.cmake:
 
-2016-02-22  Konstantin Tokarev  <annulen@yandex.ru>
-
-        [cmake] Moved library setup code to WEBKIT_FRAMEWORK macro.
-        https://bugs.webkit.org/show_bug.cgi?id=154450
-
-        Reviewed by Alex Christensen.
-
-        * CMakeLists.txt:
-
 2016-02-25  Brady Eidson  <beidson@apple.com>
 
         Remove LegacyIDB.
@@ -64,6 +157,26 @@
         * Storage/WebDatabaseProvider.cpp:
         (WebDatabaseProvider::createIDBFactoryBackend): Deleted.
         * Storage/WebDatabaseProvider.h:
+
+2016-02-25  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win][CMake] Don't use incremental linking
+        https://bugs.webkit.org/show_bug.cgi?id=154684
+        <rdar://problem/24747822>
+
+        Reviewed by Alex Christensen.
+
+        * PlatformWin.cmake: Make sure the "/INCREMENTAL:NO" flag is used
+        (overriding "/INCREMENTAL:YES").
+
+2016-02-22  Konstantin Tokarev  <annulen@yandex.ru>
+
+        [cmake] Moved library setup code to WEBKIT_FRAMEWORK macro.
+        https://bugs.webkit.org/show_bug.cgi?id=154450
+
+        Reviewed by Alex Christensen.
+
+        * CMakeLists.txt:
 
 2016-02-15  Alex Christensen  <achristensen@webkit.org>
 

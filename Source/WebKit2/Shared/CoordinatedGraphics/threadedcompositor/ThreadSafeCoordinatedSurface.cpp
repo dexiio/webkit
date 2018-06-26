@@ -42,11 +42,6 @@ Ref<ThreadSafeCoordinatedSurface> ThreadSafeCoordinatedSurface::create(const Int
     return adoptRef(*new ThreadSafeCoordinatedSurface(size, flags, ImageBuffer::create(size, Unaccelerated)));
 }
 
-Ref<ThreadSafeCoordinatedSurface> ThreadSafeCoordinatedSurface::create(const IntSize& size, CoordinatedSurface::Flags flags, std::unique_ptr<ImageBuffer> buffer)
-{
-    return adoptRef(*new ThreadSafeCoordinatedSurface(size, flags, WTFMove(buffer)));
-}
-
 ThreadSafeCoordinatedSurface::ThreadSafeCoordinatedSurface(const IntSize& size, CoordinatedSurface::Flags flags, std::unique_ptr<ImageBuffer> buffer)
     : CoordinatedSurface(size, flags)
     , m_imageBuffer(WTFMove(buffer))
@@ -82,10 +77,8 @@ void ThreadSafeCoordinatedSurface::endPaint()
     m_imageBuffer->context().restore();
 }
 
-void ThreadSafeCoordinatedSurface::copyToTexture(PassRefPtr<BitmapTexture> passTexture, const IntRect& target, const IntPoint& sourceOffset)
+void ThreadSafeCoordinatedSurface::copyToTexture(RefPtr<BitmapTexture> texture, const IntRect& target, const IntPoint& sourceOffset)
 {
-    RefPtr<BitmapTexture> texture(passTexture);
-
     ASSERT(m_imageBuffer);
     RefPtr<Image> image = m_imageBuffer->copyImage(DontCopyBackingStore);
     texture->updateContents(image.get(), target, sourceOffset, BitmapTexture::UpdateCanModifyOriginalImageData);

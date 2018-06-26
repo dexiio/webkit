@@ -148,7 +148,10 @@ namespace WebCore {
 #if PLATFORM(QT)
     String contextMenuItemTagToggleVideoFullscreen();
 #endif
-    String contextMenuItemTagMediaPlayPause();
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+    String contextMenuItemTagEnterVideoEnhancedFullscreen();
+    String contextMenuItemTagExitVideoEnhancedFullscreen();
+#endif
     String contextMenuItemTagMediaPlay();
     String contextMenuItemTagMediaPause();
     String contextMenuItemTagMediaMute();
@@ -160,6 +163,7 @@ namespace WebCore {
     String searchMenuNoRecentSearchesText();
     String searchMenuRecentSearchesText();
     String searchMenuClearRecentSearchesText();
+#endif
 
     String AXWebAreaText();
     String AXLinkText();
@@ -173,7 +177,8 @@ namespace WebCore {
     String AXFooterRoleDescriptionText();
     String AXFileUploadButtonText();
     String AXSearchFieldCancelButtonText();
-    
+    String AXAttachmentRoleText();
+
     String AXButtonActionVerb();
     String AXRadioButtonActionVerb();
     String AXTextFieldActionVerb();
@@ -183,7 +188,6 @@ namespace WebCore {
     String AXMenuListPopupActionVerb();
     String AXLinkActionVerb();
     String AXListItemActionVerb();
-#endif
 
 #if ENABLE(INPUT_TYPE_WEEK)
     // weekFormatInLDML() returns week and year format in LDML, Unicode
@@ -194,6 +198,9 @@ namespace WebCore {
     String AXARIAContentGroupText(const String& ariaType);
     String AXHorizontalRuleDescriptionText();
 #endif
+
+    String AXAutoFillCredentialsLabel();
+    String AXAutoFillContactsLabel();
 
     String missingPluginText();
     String crashedPluginText();

@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 2007 Eric Seidel <eric@webkit.org>
- *  Copyright (C) 2007, 2008, 2009, 2014, 2015 Apple Inc. All rights reserved.
+ *  Copyright (C) 2007, 2008, 2009, 2014-2016 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -173,6 +173,9 @@ struct GlobalObjectMethodTable {
 
     typedef JSValue (*ModuleLoaderEvaluatePtr)(JSGlobalObject*, ExecState*, JSValue, JSValue);
     ModuleLoaderEvaluatePtr moduleLoaderEvaluate;
+
+    typedef String (*DefaultLanguageFunctionPtr)();
+    DefaultLanguageFunctionPtr defaultLanguage;
 };
 
 class JSGlobalObject : public JSSegmentedVariableObject {
@@ -245,7 +248,7 @@ protected:
     WriteBarrier<Structure> m_moduleEnvironmentStructure;
     WriteBarrier<Structure> m_directArgumentsStructure;
     WriteBarrier<Structure> m_scopedArgumentsStructure;
-    WriteBarrier<Structure> m_outOfBandArgumentsStructure;
+    WriteBarrier<Structure> m_clonedArgumentsStructure;
         
     // Lists the actual structures used for having these particular indexing shapes.
     WriteBarrier<Structure> m_originalArrayStructureForIndexingShape[NumberOfIndexingShapes];
@@ -277,9 +280,12 @@ protected:
     WriteBarrier<Structure> m_internalFunctionStructure;
     WriteBarrier<Structure> m_iteratorResultObjectStructure;
     WriteBarrier<Structure> m_regExpMatchesArrayStructure;
+    WriteBarrier<Structure> m_regExpMatchesArraySlowPutStructure;
     WriteBarrier<Structure> m_moduleRecordStructure;
     WriteBarrier<Structure> m_moduleNamespaceObjectStructure;
     WriteBarrier<Structure> m_proxyObjectStructure;
+    WriteBarrier<Structure> m_callableProxyObjectStructure;
+    WriteBarrier<Structure> m_proxyRevokeStructure;
 #if ENABLE(WEBASSEMBLY)
     WriteBarrier<Structure> m_wasmModuleStructure;
 #endif
@@ -295,6 +301,7 @@ protected:
 
     struct TypedArrayData {
         WriteBarrier<JSObject> prototype;
+        WriteBarrier<InternalFunction> constructor;
         WriteBarrier<Structure> structure;
     };
     
@@ -363,7 +370,8 @@ public:
 
     DECLARE_EXPORT_INFO;
 
-    bool hasDebugger() const { return m_debugger; }
+    bool hasDebugger() const;
+    bool hasInteractiveDebugger() const;
     bool hasLegacyProfiler() const;
     const RuntimeFlags& runtimeFlags() const { return m_runtimeFlags; }
 
@@ -376,7 +384,7 @@ protected:
         structure()->setGlobalObject(vm, this);
         m_runtimeFlags = m_globalObjectMethodTable->javaScriptRuntimeFlags(this);
         init(vm);
-        setGlobalThis(vm, JSProxy::create(vm, JSProxy::createStructure(vm, this, prototype(), PureForwardingProxyType), this));
+        setGlobalThis(vm, JSProxy::create(vm, JSProxy::createStructure(vm, this, getPrototypeDirect(), PureForwardingProxyType), this));
     }
 
     void finishCreation(VM& vm, JSObject* thisValue)
@@ -399,7 +407,7 @@ public:
     JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
     JS_EXPORT_PRIVATE static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
-    JS_EXPORT_PRIVATE static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
+    JS_EXPORT_PRIVATE static bool put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
 
     JS_EXPORT_PRIVATE static void defineGetter(JSObject*, ExecState*, PropertyName, JSObject* getterFunc, unsigned attributes);
     JS_EXPORT_PRIVATE static void defineSetter(JSObject*, ExecState*, PropertyName, JSObject* setterFunc, unsigned attributes);
@@ -474,7 +482,7 @@ public:
     Structure* moduleEnvironmentStructure() const { return m_moduleEnvironmentStructure.get(); }
     Structure* directArgumentsStructure() const { return m_directArgumentsStructure.get(); }
     Structure* scopedArgumentsStructure() const { return m_scopedArgumentsStructure.get(); }
-    Structure* outOfBandArgumentsStructure() const { return m_outOfBandArgumentsStructure.get(); }
+    Structure* clonedArgumentsStructure() const { return m_clonedArgumentsStructure.get(); }
     Structure* originalArrayStructureForIndexingType(IndexingType indexingType) const
     {
         ASSERT(indexingType & IsArray);
@@ -532,6 +540,8 @@ public:
     Structure* moduleRecordStructure() const { return m_moduleRecordStructure.get(); }
     Structure* moduleNamespaceObjectStructure() const { return m_moduleNamespaceObjectStructure.get(); }
     Structure* proxyObjectStructure() const { return m_proxyObjectStructure.get(); }
+    Structure* callableProxyObjectStructure() const { return m_callableProxyObjectStructure.get(); }
+    Structure* proxyRevokeStructure() const { return m_proxyRevokeStructure.get(); }
 #if ENABLE(WEBASSEMBLY)
     Structure* wasmModuleStructure() const { return m_wasmModuleStructure.get(); }
 #endif
@@ -581,6 +591,11 @@ public:
         if (type == NotTypedArray)
             return false;
         return typedArrayStructure(type) == structure;
+    }
+
+    JSObject* typedArrayConstructor(TypedArrayType type) const
+    {
+        return m_typedArrays[toIndex(type)].constructor.get();
     }
 
     JSCell* actualPointerFor(Special::Pointer pointer)
@@ -727,6 +742,8 @@ inline JSArray* constructEmptyArray(ExecState* exec, ArrayAllocationProfile* pro
         structure = globalObject->arrayStructureForIndexingTypeDuringAllocation(exec, ArrayWithArrayStorage, newTarget);
     else
         structure = globalObject->arrayStructureForProfileDuringAllocation(exec, profile, newTarget);
+    if (exec->hadException())
+        return nullptr;
 
     return ArrayAllocationProfile::updateLastAllocationFor(profile, JSArray::create(exec->vm(), structure, initialLength));
 }
@@ -738,7 +755,10 @@ inline JSArray* constructEmptyArray(ExecState* exec, ArrayAllocationProfile* pro
  
 inline JSArray* constructArray(ExecState* exec, ArrayAllocationProfile* profile, JSGlobalObject* globalObject, const ArgList& values, JSValue newTarget = JSValue())
 {
-    return ArrayAllocationProfile::updateLastAllocationFor(profile, constructArray(exec, globalObject->arrayStructureForProfileDuringAllocation(exec, profile, newTarget), values));
+    Structure* structure = globalObject->arrayStructureForProfileDuringAllocation(exec, profile, newTarget);
+    if (exec->hadException())
+        return nullptr;
+    return ArrayAllocationProfile::updateLastAllocationFor(profile, constructArray(exec, structure, values));
 }
 
 inline JSArray* constructArray(ExecState* exec, ArrayAllocationProfile* profile, const ArgList& values, JSValue newTarget = JSValue())
@@ -748,7 +768,10 @@ inline JSArray* constructArray(ExecState* exec, ArrayAllocationProfile* profile,
 
 inline JSArray* constructArray(ExecState* exec, ArrayAllocationProfile* profile, JSGlobalObject* globalObject, const JSValue* values, unsigned length, JSValue newTarget = JSValue())
 {
-    return ArrayAllocationProfile::updateLastAllocationFor(profile, constructArray(exec, globalObject->arrayStructureForProfileDuringAllocation(exec, profile, newTarget), values, length));
+    Structure* structure = globalObject->arrayStructureForProfileDuringAllocation(exec, profile, newTarget);
+    if (exec->hadException())
+        return nullptr;
+    return ArrayAllocationProfile::updateLastAllocationFor(profile, constructArray(exec, structure, values, length));
 }
 
 inline JSArray* constructArray(ExecState* exec, ArrayAllocationProfile* profile, const JSValue* values, unsigned length, JSValue newTarget = JSValue())
@@ -758,7 +781,10 @@ inline JSArray* constructArray(ExecState* exec, ArrayAllocationProfile* profile,
 
 inline JSArray* constructArrayNegativeIndexed(ExecState* exec, ArrayAllocationProfile* profile, JSGlobalObject* globalObject, const JSValue* values, unsigned length, JSValue newTarget = JSValue())
 {
-    return ArrayAllocationProfile::updateLastAllocationFor(profile, constructArrayNegativeIndexed(exec, globalObject->arrayStructureForProfileDuringAllocation(exec, profile, newTarget), values, length));
+    Structure* structure = globalObject->arrayStructureForProfileDuringAllocation(exec, profile, newTarget);
+    if (exec->hadException())
+        return nullptr;
+    return ArrayAllocationProfile::updateLastAllocationFor(profile, constructArrayNegativeIndexed(exec, structure, values, length));
 }
 
 inline JSArray* constructArrayNegativeIndexed(ExecState* exec, ArrayAllocationProfile* profile, const JSValue* values, unsigned length, JSValue newTarget = JSValue())

@@ -4,6 +4,8 @@
 *.pyc
 .DS_Store
 .directory
+.idea
+*.iml
 build/
 /WebKitBuild/
 autoinstall.cache.d

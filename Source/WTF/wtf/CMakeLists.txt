@@ -94,6 +94,7 @@ set(WTF_HEADERS
     SaturatedArithmetic.h
     ScopedLambda.h
     SegmentedVector.h
+    SmallPtrSet.h
     StackBounds.h
     StackStats.h
     StaticConstructors.h
@@ -185,7 +186,6 @@ set(WTF_SOURCES
     RAMSize.cpp
     RandomNumber.cpp
     RefCountedLeakCounter.cpp
-    RefCounter.cpp
     RunLoop.cpp
     SHA1.cpp
     SixCharacterHash.cpp
@@ -291,5 +291,3 @@ if (MSVC)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
 endif ()
-
-QT_ADD_EXTRA_WEBKIT_TARGET_EXPORT(WTF)

@@ -47,6 +47,7 @@ bool doesGC(Graph& graph, Node* node)
     case JSConstant:
     case DoubleConstant:
     case Int52Constant:
+    case LazyJSConstant:
     case Identity:
     case GetCallee:
     case GetArgumentCount:
@@ -89,11 +90,13 @@ bool doesGC(Graph& graph, Node* node)
     case ArithRound:
     case ArithFloor:
     case ArithCeil:
+    case ArithTrunc:
     case ArithFRound:
     case ArithSin:
     case ArithCos:
     case ArithLog:
     case ValueAdd:
+    case TryGetById:
     case GetById:
     case GetByIdFlush:
     case PutById:
@@ -107,12 +110,15 @@ bool doesGC(Graph& graph, Node* node)
     case CheckStructure:
     case GetExecutable:
     case GetButterfly:
-    case GetButterflyReadOnly:
     case CheckArray:
     case GetScope:
     case SkipScope:
+    case GetGlobalObject:
     case GetClosureVar:
     case PutClosureVar:
+    case GetRegExpObjectLastIndex:
+    case SetRegExpObjectLastIndex:
+    case RecordRegExpCachedResult:
     case GetGlobalVar:
     case GetGlobalLexicalVariable:
     case PutGlobalVariable:
@@ -139,7 +145,6 @@ bool doesGC(Graph& graph, Node* node)
     case ConstructForwardVarargs:
     case TailCallForwardVarargs:
     case TailCallForwardVarargsInlinedCaller:
-    case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
     case ProfileType:
@@ -176,7 +181,6 @@ bool doesGC(Graph& graph, Node* node)
     case CheckTierUpInLoop:
     case CheckTierUpAtReturn:
     case CheckTierUpAndOSREnter:
-    case CheckTierUpWithNestedTriggerAndOSREnter:
     case LoopHint:
     case StoreBarrier:
     case InvalidationPoint:
@@ -231,6 +235,8 @@ bool doesGC(Graph& graph, Node* node)
     case GetFromArguments:
     case PutToArguments:
     case CopyRest:
+    case LogShadowChickenPrologue:
+    case LogShadowChickenTail:
         return false;
 
     case CreateActivation:
@@ -250,7 +256,6 @@ bool doesGC(Graph& graph, Node* node)
     case NewRegexp:
     case NewStringObject:
     case MakeRope:
-    case NewArrowFunction:
     case NewFunction:
     case NewGeneratorFunction:
     case NewTypedArray:
@@ -261,6 +266,7 @@ bool doesGC(Graph& graph, Node* node)
     case ToIndexString:
     case MaterializeNewObject:
     case MaterializeCreateActivation:
+    case SetFunctionName:
     case StrCat:
     case StringReplace:
         return true;

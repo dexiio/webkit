@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.12)
 include(WebKitCommon)
+set_property(DIRECTORY . PROPERTY FOLDER "WebKit")
 
 set(WebKit_SOURCES
     Storage/StorageAreaImpl.cpp
@@ -34,7 +35,6 @@ set(WebKit_SYSTEM_INCLUDE_DIRECTORIES
 
 set(WebKit_LIBRARIES
     PRIVATE JavaScriptCore${DEBUG_SUFFIX}
-    PRIVATE WTF${DEBUG_SUFFIX}
     PRIVATE WebCore${DEBUG_SUFFIX}
 )
 
@@ -50,9 +50,21 @@ if (MSVC)
     endif ()
 endif ()
 
-set(WebKit_PRIVATE_HEADERS_LOCATION Headers/${PROJECT_VERSION}/QtWebKit/private)
+add_library(WebKit ${WebKit_LIBRARY_TYPE} ${WebKit_SOURCES})
+add_dependencies(WebKit WebCore)
+if (TARGET WebKitGUID)
+    add_dependencies(WebKit WebKitGUID)
+endif ()
+target_link_libraries(WebKit ${WebKit_LIBRARIES})
+set_target_properties(WebKit PROPERTIES FOLDER "WebKit")
+
+if (WebKit_OUTPUT_NAME)
+    set_target_properties(WebKit PROPERTIES OUTPUT_NAME ${WebKit_OUTPUT_NAME})
+endif ()
 
 WEBKIT_FRAMEWORK(WebKit)
+
+set(WebKit_PRIVATE_HEADERS_LOCATION Headers/${PROJECT_VERSION}/QtWebKit/private)
 
 if (${PORT} STREQUAL "Qt")
     set_target_properties(WebKit PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
@@ -88,9 +100,4 @@ if (${PORT} STREQUAL "Qt")
     if (ENABLE_WEBKIT2)
         add_dependencies(WebKit WebKit2)
     endif ()
-endif ()
-
-add_dependencies(WebKit WebCore)
-if (TARGET WebKitGUID)
-    add_dependencies(WebKit WebKitGUID)
 endif ()

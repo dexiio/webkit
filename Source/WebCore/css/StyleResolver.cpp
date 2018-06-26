@@ -267,7 +267,7 @@ StyleResolver::StyleResolver(Document& document)
         m_medium = std::make_unique<MediaQueryEvaluator>("all");
 
     if (root)
-        m_rootDefaultStyle = styleForElement(*root, m_document.renderStyle(), MatchOnlyUserAgentRules);
+        m_rootDefaultStyle = styleForElement(*root, m_document.renderStyle(), MatchOnlyUserAgentRules).renderStyle;
 
     if (m_rootDefaultStyle && view)
         m_medium = std::make_unique<MediaQueryEvaluator>(view->mediaType(), &view->frame(), m_rootDefaultStyle.get());
@@ -335,7 +335,7 @@ void StyleResolver::sweepMatchedPropertiesCache()
     m_matchedPropertiesCacheAdditionsSinceLastSweep = 0;
 }
 
-StyleResolver::State::State(Element& element, RenderStyle* parentStyle, const RenderRegion* regionForStyling, const SelectorFilter* selectorFilter)
+StyleResolver::State::State(Element& element, RenderStyle* parentStyle, RenderStyle* documentElementStyle, const RenderRegion* regionForStyling, const SelectorFilter* selectorFilter)
     : m_element(&element)
     , m_parentStyle(parentStyle)
     , m_regionForStyling(regionForStyling)
@@ -348,7 +348,10 @@ StyleResolver::State::State(Element& element, RenderStyle* parentStyle, const Re
 
     auto& document = element.document();
     auto* documentElement = document.documentElement();
-    m_rootElementStyle = (!documentElement || documentElement == &element) ? document.renderStyle() : documentElement->renderStyle();
+    if (!documentElement || documentElement == &element)
+        m_rootElementStyle = document.renderStyle();
+    else
+        m_rootElementStyle = documentElementStyle ? documentElementStyle : documentElement->renderStyle();
 
     updateConversionData();
 }
@@ -371,11 +374,11 @@ static inline bool isAtShadowBoundary(const Element* element)
     return parentNode && parentNode->isShadowRoot();
 }
 
-Ref<RenderStyle> StyleResolver::styleForElement(Element& element, RenderStyle* parentStyle, RuleMatchingBehavior matchingBehavior, const RenderRegion* regionForStyling, const SelectorFilter* selectorFilter)
+ElementStyle StyleResolver::styleForElement(Element& element, RenderStyle* parentStyle, RuleMatchingBehavior matchingBehavior, const RenderRegion* regionForStyling, const SelectorFilter* selectorFilter)
 {
     RELEASE_ASSERT(!m_inLoadPendingImages);
 
-    m_state = State(element, parentStyle, regionForStyling, selectorFilter);
+    m_state = State(element, parentStyle, m_overrideDocumentElementStyle.get(), regionForStyling, selectorFilter);
     State& state = m_state;
 
     if (state.parentStyle()) {
@@ -386,20 +389,22 @@ Ref<RenderStyle> StyleResolver::styleForElement(Element& element, RenderStyle* p
         state.setParentStyle(RenderStyle::clone(state.style()));
     }
 
+    auto& style = *state.style();
+
     if (element.isLink()) {
-        state.style()->setIsLink(true);
+        style.setIsLink(true);
         EInsideLink linkState = state.elementLinkState();
         if (linkState != NotInsideLink) {
             bool forceVisited = InspectorInstrumentation::forcePseudoState(element, CSSSelector::PseudoClassVisited);
             if (forceVisited)
                 linkState = InsideVisitedLink;
         }
-        state.style()->setInsideLink(linkState);
+        style.setInsideLink(linkState);
     }
 
     CSSDefaultStyleSheets::ensureDefaultStyleSheetsForElement(element);
 
-    ElementRuleCollector collector(element, state.style(), m_ruleSets, m_state.selectorFilter());
+    ElementRuleCollector collector(element, m_ruleSets, m_state.selectorFilter());
     collector.setRegionForStyling(regionForStyling);
     collector.setMedium(m_medium.get());
 
@@ -407,6 +412,15 @@ Ref<RenderStyle> StyleResolver::styleForElement(Element& element, RenderStyle* p
         collector.matchUARules();
     else
         collector.matchAllRules(m_matchAuthorAndUserStyles, matchingBehavior != MatchAllRulesExcludingSMIL);
+
+    if (collector.matchedPseudoElementIds())
+        style.setHasPseudoStyles(collector.matchedPseudoElementIds());
+
+    // This is required for style sharing.
+    if (collector.didMatchUncommonAttributeSelector())
+        style.setUnique();
+
+    auto elementStyleRelations = Style::commitRelationsToRenderStyle(style, element, collector.styleRelations());
 
     applyMatchedProperties(collector.matchedResult(), element);
 
@@ -418,8 +432,7 @@ Ref<RenderStyle> StyleResolver::styleForElement(Element& element, RenderStyle* p
 
     state.clear(); // Clear out for the next resolve.
 
-    // Now return the style.
-    return state.takeStyle();
+    return { state.takeStyle(), WTFMove(elementStyleRelations) };
 }
 
 Ref<RenderStyle> StyleResolver::styleForKeyframe(const RenderStyle* elementStyle, const StyleKeyframe* keyframe, KeyframeValue& keyframeValue)
@@ -558,7 +571,7 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element& element, c
     // those rules.
 
     // Check UA, user and author rules.
-    ElementRuleCollector collector(element, m_state.style(), m_ruleSets, m_state.selectorFilter());
+    ElementRuleCollector collector(element, m_ruleSets, m_state.selectorFilter());
     collector.setPseudoStyleRequest(pseudoStyleRequest);
     collector.setMedium(m_medium.get());
     collector.matchUARules();
@@ -567,6 +580,8 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element& element, c
         collector.matchUserRules(false);
         collector.matchAuthorRules(false);
     }
+
+    ASSERT(!collector.matchedPseudoElementIds());
 
     if (collector.matchedResult().matchedProperties().isEmpty())
         return nullptr;
@@ -708,6 +723,7 @@ static EDisplay equivalentBlockDisplay(EDisplay display, bool isFloating, bool s
     case TABLE_COLUMN:
     case TABLE_CELL:
     case TABLE_CAPTION:
+    case CONTENTS:
         return BLOCK;
     case NONE:
         ASSERT_NOT_REACHED();
@@ -750,6 +766,15 @@ void StyleResolver::adjustRenderStyle(RenderStyle& style, const RenderStyle& par
     style.setOriginalDisplay(style.display());
 
     if (style.display() != NONE) {
+        if (style.display() == CONTENTS) {
+            // FIXME: Enable for all elements.
+            bool elementSupportsDisplayContents = false;
+#if ENABLE(SHADOW_DOM) || ENABLE(DETAILS_ELEMENT)
+            elementSupportsDisplayContents = is<HTMLSlotElement>(e);
+#endif
+            if (!elementSupportsDisplayContents)
+                style.setDisplay(INLINE);
+        }
         // If we have a <td> that specifies a float property, in quirks mode we just drop the float
         // property.
         // Sites also commonly use display:inline/block on <td>s and <table>s. In quirks mode we force
@@ -876,12 +901,14 @@ void StyleResolver::adjustRenderStyle(RenderStyle& style, const RenderStyle& par
     else
         style.addToTextDecorationsInEffect(style.textDecoration());
 
+    // For now, <marquee> requires an overflow clip to work properly.
+    if (is<HTMLMarqueeElement>(e)) {
+        style.setOverflowX(OHIDDEN);
+        style.setOverflowY(OHIDDEN);
+    }
+
     // If either overflow value is not visible, change to auto.
-    if (style.overflowX() == OMARQUEE && style.overflowY() != OMARQUEE)
-        style.setOverflowY(OMARQUEE);
-    else if (style.overflowY() == OMARQUEE && style.overflowX() != OMARQUEE)
-        style.setOverflowX(OMARQUEE);
-    else if (style.overflowX() == OVISIBLE && style.overflowY() != OVISIBLE) {
+    if (style.overflowX() == OVISIBLE && style.overflowY() != OVISIBLE) {
         // FIXME: Once we implement pagination controls, overflow-x should default to hidden
         // if overflow-y is set to -webkit-paged-x or -webkit-page-y. For now, we'll let it
         // default to auto so we can at least scroll through the pages.
@@ -1040,7 +1067,7 @@ Vector<RefPtr<StyleRule>> StyleResolver::pseudoStyleRulesForElement(Element* ele
 
     m_state = State(*element, nullptr);
 
-    ElementRuleCollector collector(*element, nullptr, m_ruleSets, m_state.selectorFilter());
+    ElementRuleCollector collector(*element, m_ruleSets, m_state.selectorFilter());
     collector.setMode(SelectorChecker::Mode::CollectingRules);
     collector.setPseudoStyleRequest(PseudoStyleRequest(pseudoId));
     collector.setMedium(m_medium.get());

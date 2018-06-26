@@ -64,7 +64,9 @@ enum AutoFillButtonType {
 };
 
 [
+    UsePointersEvenForNonNullableObjectArguments,
     NoInterfaceObject,
+    ExportMacro=WEBCORE_TESTSUPPORT_EXPORT,
 ] interface Internals {
     DOMString address(Node node);
     [RaisesException] boolean nodeNeedsStyleRecalc(Node node);
@@ -161,6 +163,8 @@ enum AutoFillButtonType {
     [RaisesException] void setAutofilled(Element inputElement, boolean enabled);
     [RaisesException] void setShowAutoFillButton(Element inputElement, AutoFillButtonType autoFillButtonType);
     [RaisesException] unsigned long countMatchesForText(DOMString text, unsigned long findOptions, DOMString markMatches);
+
+    [RaisesException] DOMString autofillFieldName(Element formControlElement);
 
     [RaisesException] void paintControlTints();
 
@@ -291,6 +295,8 @@ enum AutoFillButtonType {
     [RaisesException] void setUseFixedLayout(boolean useFixedLayout);
     [RaisesException] void setFixedLayoutSize(long width, long height);
 
+    [RaisesException] void setViewExposedRect(unrestricted float x, unrestricted float y, unrestricted float width, unrestricted float height);
+
     void setHeaderHeight(unrestricted float height);
     void setFooterHeight(unrestricted float height);
 
@@ -355,6 +361,7 @@ enum AutoFillButtonType {
 
     void setUsesOverlayScrollbars(boolean enabled);
     void setUsesMockScrollAnimator(boolean enabled);
+    void setMockScrollbarsEnabled(boolean enabled);
 
     void forceReload(boolean endToEnd);
 
@@ -448,4 +455,6 @@ enum AutoFillButtonType {
     [RaisesException] void setCanShowModalDialogOverride(boolean allow);
 
     DOMString composedTreeAsText(Node parent);
+
+    void setViewportForceAlwaysUserScalable(boolean scalable);
 };

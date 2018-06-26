@@ -41,53 +41,27 @@
 
 namespace WebCore {
 
-class Attribute;
-class ClassCollection;
 class ContainerNode;
-class DOMTokenList;
 class Document;
 class Element;
-class Event;
-class EventListener;
 class FloatPoint;
-class Frame;
-class HTMLInputElement;
 class HTMLQualifiedName;
 class HTMLSlotElement;
-class IntRect;
-class KeyboardEvent;
 class MathMLQualifiedName;
-class NSResolver;
-class NameNodeList;
 class NamedNodeMap;
 class NodeList;
 class NodeListsNodeData;
 class NodeOrString;
 class NodeRareData;
 class QualifiedName;
-class RadioNodeList;
-class RegisteredEventListener;
 class RenderBox;
 class RenderBoxModelObject;
 class RenderObject;
 class RenderStyle;
 class SVGQualifiedName;
 class ShadowRoot;
-class TagCollection;
-
-#if ENABLE(QT_GESTURE_EVENTS)
-class PlatformGestureEvent;
-#endif
-
-#if ENABLE(INDIE_UI)
-class UIRequestEvent;
-#endif
-    
-#if ENABLE(TOUCH_EVENTS) && !PLATFORM(IOS)
 class TouchEvent;
-#endif
-
-typedef int ExceptionCode;
+class UIRequestEvent;
 
 const int nodeStyleChangeShift = 14;
 
@@ -207,6 +181,7 @@ public:
     };
     virtual Ref<Node> cloneNodeInternal(Document&, CloningOperation) = 0;
     Ref<Node> cloneNode(bool deep) { return cloneNodeInternal(document(), deep ? CloningOperation::Everything : CloningOperation::OnlySelf); }
+    RefPtr<Node> cloneNodeForBindings(bool deep, ExceptionCode&);
 
     virtual const AtomicString& localName() const;
     virtual const AtomicString& namespaceURI() const;
@@ -291,7 +266,11 @@ public:
 
 #if ENABLE(CUSTOM_ELEMENTS)
     bool isCustomElement() const { return getFlag(IsCustomElement); }
-    void setIsCustomElement() { return setFlag(IsCustomElement); }
+    void setIsCustomElement() { setFlag(IsCustomElement); }
+
+    bool isUnresolvedCustomElement() const { return isElementNode() && getFlag(IsEditingTextOrUnresolvedCustomElementFlag); }
+    void setIsUnresolvedCustomElement() { setFlag(IsEditingTextOrUnresolvedCustomElementFlag); }
+    void setCustomElementIsResolved();
 #endif
 
     // Returns null, a child of ShadowRoot, or a legacy shadow root.
@@ -299,10 +278,9 @@ public:
 
     // Node's parent or shadow tree host.
     ContainerNode* parentOrShadowHostNode() const;
-    ContainerNode* parentInComposedTree() const;
     Element* parentOrShadowHostElement() const;
     void setParentNode(ContainerNode*);
-    Node* highestAncestor() const;
+    Node* rootNode() const;
 
     // Use when it's guaranteed to that shadowHost is null.
     ContainerNode* parentNodeGuaranteedHostFree() const;
@@ -346,7 +324,7 @@ public:
     StyleChangeType styleChangeType() const { return static_cast<StyleChangeType>(m_nodeFlags & StyleChangeMask); }
     bool childNeedsStyleRecalc() const { return getFlag(ChildNeedsStyleRecalcFlag); }
     bool styleIsAffectedByPreviousSibling() const { return getFlag(StyleIsAffectedByPreviousSibling); }
-    bool isEditingText() const { return getFlag(IsEditingTextFlag); }
+    bool isEditingText() const { return getFlag(IsTextFlag) && getFlag(IsEditingTextOrUnresolvedCustomElementFlag); }
 
     void setChildNeedsStyleRecalc() { setFlag(ChildNeedsStyleRecalcFlag); }
     void clearChildNeedsStyleRecalc() { m_nodeFlags &= ~(ChildNeedsStyleRecalcFlag | DirectChildNeedsStyleRecalcFlag); }
@@ -520,16 +498,16 @@ public:
 
     WEBCORE_EXPORT unsigned short compareDocumentPosition(Node*);
 
-    virtual Node* toNode() override;
+    Node* toNode() override;
 
-    virtual EventTargetInterface eventTargetInterface() const override;
-    virtual ScriptExecutionContext* scriptExecutionContext() const override final; // Implemented in Document.h
+    EventTargetInterface eventTargetInterface() const override;
+    ScriptExecutionContext* scriptExecutionContext() const final; // Implemented in Document.h
 
-    virtual bool addEventListener(const AtomicString& eventType, RefPtr<EventListener>&&, bool useCapture) override;
-    virtual bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture) override;
+    bool addEventListener(const AtomicString& eventType, RefPtr<EventListener>&&, bool useCapture) override;
+    bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture) override;
 
     using EventTarget::dispatchEvent;
-    virtual bool dispatchEvent(Event&) override;
+    bool dispatchEvent(Event&) override;
 
     void dispatchScopedEvent(Event&);
 
@@ -538,9 +516,6 @@ public:
     void dispatchSubtreeModifiedEvent();
     bool dispatchDOMActivateEvent(int detail, PassRefPtr<Event> underlyingEvent);
 
-#if ENABLE(QT_GESTURE_EVENTS)
-    bool dispatchGestureEvent(const PlatformGestureEvent&);
-#endif
 #if ENABLE(TOUCH_EVENTS)
     virtual bool allowsDoubleTapGesture() const { return true; }
 #endif
@@ -570,8 +545,8 @@ public:
     bool m_adoptionIsRequired { true };
 #endif
 
-    virtual EventTargetData* eventTargetData() override final;
-    virtual EventTargetData& ensureEventTargetData() override final;
+    EventTargetData* eventTargetData() final;
+    EventTargetData& ensureEventTargetData() final;
 
     void getRegisteredMutationObserversOfType(HashMap<MutationObserver*, MutationRecordDeliveryOptions>&, MutationObserver::MutationType, const QualifiedName* attributeName);
     void registerMutationObserver(MutationObserver*, MutationObserverOptions, const HashSet<AtomicString>& attributeFilter);
@@ -624,7 +599,7 @@ protected:
         IsParsingChildrenFinishedFlag = 1 << 13, // Element
 
         StyleChangeMask = 1 << nodeStyleChangeShift | 1 << (nodeStyleChangeShift + 1) | 1 << (nodeStyleChangeShift + 2),
-        IsEditingTextFlag = 1 << 17,
+        IsEditingTextOrUnresolvedCustomElementFlag = 1 << 17,
         IsNamedFlowContentNodeFlag = 1 << 18,
         HasSyntheticAttrChildNodesFlag = 1 << 19,
         HasCustomStyleResolveCallbacksFlag = 1 << 20,
@@ -663,7 +638,7 @@ protected:
         CreateHTMLElement = CreateStyledElement | IsHTMLFlag,
         CreateSVGElement = CreateStyledElement | IsSVGFlag | HasCustomStyleResolveCallbacksFlag,
         CreateDocument = CreateContainer | InDocumentFlag,
-        CreateEditingText = CreateText | IsEditingTextFlag,
+        CreateEditingText = CreateText | IsEditingTextOrUnresolvedCustomElementFlag,
         CreateMathMLElement = CreateStyledElement | IsMathMLFlag
     };
     Node(Document&, ConstructionType);
@@ -696,8 +671,8 @@ private:
 
     WEBCORE_EXPORT void removedLastRef();
 
-    virtual void refEventTarget() override;
-    virtual void derefEventTarget() override;
+    void refEventTarget() override;
+    void derefEventTarget() override;
 
     Element* ancestorElement() const;
 
@@ -716,9 +691,9 @@ private:
     Node* m_next { nullptr };
     // When a node has rare data we move the renderer into the rare data.
     union DataUnion {
-        RenderObject* m_renderer;
+        RenderObject* m_renderer { nullptr };
         NodeRareDataBase* m_rareData;
-    } m_data { nullptr };
+    } m_data;
 
 protected:
     bool isParsingChildrenFinished() const { return getFlag(IsParsingChildrenFinishedFlag); }
@@ -797,6 +772,16 @@ inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
     ASSERT(!isShadowRoot());
     return parentNode();
 }
+
+#if ENABLE(CUSTOM_ELEMENTS)
+
+inline void Node::setCustomElementIsResolved()
+{
+    clearFlag(IsEditingTextOrUnresolvedCustomElementFlag);
+    setFlag(IsCustomElement);
+}
+
+#endif
 
 } // namespace WebCore
 

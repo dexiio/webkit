@@ -275,6 +275,7 @@ namespace WebCore {
         bool activeDOMObjectsAndAnimationsSuspended() const { return m_activeDOMObjectsAndAnimationsSuspendedCount > 0; }
 
         bool isURLAllowed(const URL&) const;
+        bool isAlwaysOnLoggingAllowed() const;
 
     // ========
 
@@ -283,8 +284,6 @@ namespace WebCore {
         void setMainFrameWasDestroyed();
 
     private:
-        void injectUserScriptsForWorld(DOMWrapperWorld&, const UserScriptVector&, UserScriptInjectionTime);
-
         HashSet<FrameDestructionObserver*> m_destructionObservers;
 
         MainFrame& m_mainFrame;
@@ -331,7 +330,6 @@ namespace WebCore {
 
         int m_activeDOMObjectsAndAnimationsSuspendedCount;
         bool m_mainFrameWasDestroyed { false };
-        bool m_documentIsBeingReplaced { false };
 
     protected:
         std::unique_ptr<EventHandler> m_eventHandler;

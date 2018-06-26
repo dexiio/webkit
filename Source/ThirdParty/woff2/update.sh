@@ -10,9 +10,8 @@ git clone https://github.com/google/woff2 ${MY_TEMP_DIR}/woff2
 COMMIT=`(cd ${MY_TEMP_DIR}/woff2 && git log | head -n 1)`
 perl -p -i -e "s/\[commit [0-9a-f]{40}\]/[${COMMIT}]/" README.webkit;
 
-rm -rf src include
+rm -rf src
 mv ${MY_TEMP_DIR}/woff2/src src
-mv ${MY_TEMP_DIR}/woff2/include include
 rm -rf ${MY_TEMP_DIR}
 
 echo "###"

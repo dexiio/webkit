@@ -32,6 +32,7 @@ set(test_webcore_LIBRARIES
     Shlwapi
     Usp10
     WebCore${DEBUG_SUFFIX}
+    WebCoreDerivedSources${DEBUG_SUFFIX}
     WebKit${DEBUG_SUFFIX}
     gtest
 )
@@ -41,6 +42,7 @@ set(TestWebCoreLib_SOURCES
     ${TESTWEBKITAPI_DIR}/TestsController.cpp
     ${TESTWEBKITAPI_DIR}/Tests/WebCore/CalculationValue.cpp
     ${TESTWEBKITAPI_DIR}/Tests/WebCore/CSSParser.cpp
+    ${TESTWEBKITAPI_DIR}/Tests/WebCore/HTMLParserIdioms.cpp
     ${TESTWEBKITAPI_DIR}/Tests/WebCore/LayoutUnit.cpp
     ${TESTWEBKITAPI_DIR}/Tests/WebCore/ParsedContentRange.cpp
     ${TESTWEBKITAPI_DIR}/Tests/WebCore/SharedBuffer.cpp
@@ -87,6 +89,7 @@ add_library(TestWTFLib SHARED
 )
 set_target_properties(TestWTFLib PROPERTIES OUTPUT_NAME "TestWTFLib")
 target_link_libraries(TestWTFLib ${test_wtf_LIBRARIES})
+add_dependencies(TestWTFLib ${ForwardingHeadersForTestWebKitAPI_NAME})
 
 set(test_wtf_LIBRARIES
     shlwapi
@@ -105,6 +108,7 @@ add_executable(TestWebCore
     ${TOOLS_DIR}/win/DLLLauncher/DLLLauncherMain.cpp
 )
 target_link_libraries(TestWebCore shlwapi)
+add_dependencies(TestWebCore ${ForwardingHeadersForTestWebKitAPI_NAME})
 
 
 add_test(TestWebCore ${TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY}/TestWebCore)
@@ -123,6 +127,7 @@ add_executable(TestWebKit
     ${TOOLS_DIR}/win/DLLLauncher/DLLLauncherMain.cpp
 )
 target_link_libraries(TestWebKit shlwapi)
+add_dependencies(TestWebKit ${ForwardingHeadersForTestWebKitAPI_NAME})
 
 add_test(TestWebKit ${TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY}/TestWebKit)
 set_tests_properties(TestWebKit PROPERTIES TIMEOUT 60)

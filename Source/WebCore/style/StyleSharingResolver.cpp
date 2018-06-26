@@ -33,6 +33,8 @@
 #include "NodeRenderStyle.h"
 #include "RenderStyle.h"
 #include "SVGElement.h"
+#include "ShadowRoot.h"
+#include "StyleUpdate.h"
 #include "StyledElement.h"
 #include "VisitedLinkState.h"
 #include "WebVTTElement.h"
@@ -44,6 +46,7 @@ namespace Style {
 static const unsigned cStyleSearchThreshold = 10;
 
 struct SharingResolver::Context {
+    const Update& update;
     const StyledElement& element;
     bool elementAffectedByClassRules;
     EInsideLink elementLinkState;
@@ -67,7 +70,7 @@ static inline bool elementHasDirectionAuto(const Element& element)
     return is<HTMLElement>(element) && downcast<HTMLElement>(element).hasDirectionAuto();
 }
 
-RefPtr<RenderStyle> SharingResolver::resolve(const Element& searchElement)
+RefPtr<RenderStyle> SharingResolver::resolve(const Element& searchElement, const Update& update)
 {
     if (!is<StyledElement>(searchElement))
         return nullptr;
@@ -75,7 +78,9 @@ RefPtr<RenderStyle> SharingResolver::resolve(const Element& searchElement)
     if (!element.parentElement())
         return nullptr;
     auto& parentElement = *element.parentElement();
-    if (!parentElement.renderStyle())
+    if (parentElement.shadowRoot())
+        return nullptr;
+    if (!update.elementStyle(parentElement))
         return nullptr;
     // If the element has inline style it is probably unique.
     if (element.inlineStyle())
@@ -91,8 +96,13 @@ RefPtr<RenderStyle> SharingResolver::resolve(const Element& searchElement)
         return nullptr;
     if (elementHasDirectionAuto(element))
         return nullptr;
+#if ENABLE(SHADOW_DOM)
+    if (element.shadowRoot() && !element.shadowRoot()->styleResolver().ruleSets().authorStyle()->hostPseudoClassRules().isEmpty())
+        return nullptr;
+#endif
 
     Context context {
+        update,
         element,
         element.hasClass() && classNamesAffectedByRules(element.classNames()),
         m_document.visitedLinkState().determineLinkState(element)
@@ -125,7 +135,7 @@ RefPtr<RenderStyle> SharingResolver::resolve(const Element& searchElement)
 
     m_elementsSharingStyle.add(&element, shareElement);
 
-    return RenderStyle::clone(shareElement->renderStyle());
+    return RenderStyle::clone(update.elementStyle(*shareElement));
 }
 
 StyledElement* SharingResolver::findSibling(const Context& context, Node* node, unsigned& count) const
@@ -193,7 +203,7 @@ static bool canShareStyleWithControl(const HTMLFormControlElement& element, cons
 bool SharingResolver::canShareStyleWithElement(const Context& context, const StyledElement& candidateElement) const
 {
     auto& element = context.element;
-    auto* style = candidateElement.renderStyle();
+    auto* style = context.update.elementStyle(candidateElement);
     if (!style)
         return false;
     if (style->unique())
@@ -273,6 +283,11 @@ bool SharingResolver::canShareStyleWithElement(const Context& context, const Sty
     if (element.matchesInvalidPseudoClass() != element.matchesValidPseudoClass())
         return false;
 
+#if ENABLE(SHADOW_DOM)
+    if (element.shadowRoot() && !element.shadowRoot()->styleResolver().ruleSets().authorStyle()->hostPseudoClassRules().isEmpty())
+        return nullptr;
+#endif
+
 #if ENABLE(VIDEO_TRACK)
     // Deny sharing styles between WebVTT and non-WebVTT nodes.
     if (is<WebVTTElement>(element))
@@ -291,7 +306,7 @@ bool SharingResolver::styleSharingCandidateMatchesRuleSet(const StyledElement& e
     if (!ruleSet)
         return false;
 
-    ElementRuleCollector collector(const_cast<StyledElement&>(element), nullptr, m_ruleSets, &m_selectorFilter);
+    ElementRuleCollector collector(const_cast<StyledElement&>(element), m_ruleSets, &m_selectorFilter);
     return collector.hasAnyMatchingRules(ruleSet);
 }
 

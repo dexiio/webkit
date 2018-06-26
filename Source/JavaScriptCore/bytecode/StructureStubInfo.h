@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,7 +33,6 @@
 #include "ObjectPropertyConditionSet.h"
 #include "Opcode.h"
 #include "Options.h"
-#include "PolymorphicAccess.h"
 #include "RegisterSet.h"
 #include "Structure.h"
 #include "StructureStubClearingWatchpoint.h"
@@ -42,10 +41,13 @@ namespace JSC {
 
 #if ENABLE(JIT)
 
+class AccessCase;
+class AccessGenerationResult;
 class PolymorphicAccess;
 
 enum class AccessType : int8_t {
     Get,
+    GetPure,
     Put,
     In
 };
@@ -68,8 +70,7 @@ public:
     void initPutByIdReplace(CodeBlock*, Structure* baseObjectStructure, PropertyOffset);
     void initStub(CodeBlock*, std::unique_ptr<PolymorphicAccess>);
 
-    MacroAssemblerCodePtr addAccessCase(
-        CodeBlock*, const Identifier&, std::unique_ptr<AccessCase>);
+    AccessGenerationResult addAccessCase(CodeBlock*, const Identifier&, std::unique_ptr<AccessCase>);
 
     void reset(CodeBlock*);
 
@@ -167,13 +168,13 @@ inline CodeOrigin getStructureStubInfoCodeOrigin(StructureStubInfo& structureStu
     return structureStubInfo.codeOrigin;
 }
 
-typedef HashMap<CodeOrigin, StructureStubInfo*, CodeOriginApproximateHash> StubInfoMap;
-
 #else
 
-typedef HashMap<int, void*> StubInfoMap;
+class StructureStubInfo;
 
 #endif // ENABLE(JIT)
+
+typedef HashMap<CodeOrigin, StructureStubInfo*, CodeOriginApproximateHash> StubInfoMap;
 
 } // namespace JSC
 

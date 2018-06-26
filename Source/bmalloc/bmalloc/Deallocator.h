@@ -51,14 +51,16 @@ private:
     bool deallocateFastCase(void*);
     void deallocateSlowCase(void*);
 
+    void deallocateXLarge(void*);
+
     FixedVector<void*, deallocatorLogCapacity> m_objectLog;
     bool m_isBmallocEnabled;
 };
 
 inline bool Deallocator::deallocateFastCase(void* object)
 {
-    BASSERT(mightBeLarge(nullptr));
-    if (mightBeLarge(object))
+    BASSERT(isXLarge(nullptr));
+    if (isXLarge(object))
         return false;
 
     if (m_objectLog.size() == m_objectLog.capacity())

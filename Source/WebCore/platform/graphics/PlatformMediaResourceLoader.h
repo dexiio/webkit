@@ -30,6 +30,7 @@
 
 #include <wtf/Noncopyable.h>
 #include <wtf/RefCounted.h>
+#include <wtf/ThreadSafeRefCounted.h>
 
 namespace WebCore {
 
@@ -44,6 +45,7 @@ public:
 
     virtual void responseReceived(PlatformMediaResource&, const ResourceResponse&) { }
     virtual void redirectReceived(PlatformMediaResource&, ResourceRequest&, const ResourceResponse&) { }
+    virtual bool shouldCacheResponse(PlatformMediaResource&, const ResourceResponse&) { return true; }
     virtual void dataSent(PlatformMediaResource&, unsigned long long, unsigned long long) { }
     virtual void dataReceived(PlatformMediaResource&, const char*, int) { }
     virtual void accessControlCheckFailed(PlatformMediaResource&, const ResourceError&) { }
@@ -54,7 +56,7 @@ public:
 #endif
 };
 
-class PlatformMediaResourceLoader : public RefCounted<PlatformMediaResourceLoader> {
+class PlatformMediaResourceLoader : public ThreadSafeRefCounted<PlatformMediaResourceLoader> {
     WTF_MAKE_NONCOPYABLE(PlatformMediaResourceLoader); WTF_MAKE_FAST_ALLOCATED;
 public:
     enum LoadOption {

@@ -36,6 +36,7 @@
 #include "JSReadableStream.h"
 #include "JSReadableStreamPrivateConstructors.h"
 #include "JSWorkerGlobalScope.h"
+#include "RuntimeEnabledFeatures.h"
 #include "WebCoreJSClientData.h"
 #include "WorkerGlobalScope.h"
 
@@ -90,7 +91,7 @@ void JSDOMGlobalObject::addBuiltinGlobals(VM& vm)
 #endif
         JSDOMGlobalObject::GlobalPropertyInfo(clientData.builtinNames().ReadableStreamControllerPrivateName(), privateReadableStreamControllerConstructor, DontDelete | ReadOnly),
         JSDOMGlobalObject::GlobalPropertyInfo(clientData.builtinNames().ReadableStreamReaderPrivateName(), privateReadableStreamReaderConstructor, DontDelete | ReadOnly),
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(WEB_RTC)
         JSDOMGlobalObject::GlobalPropertyInfo(clientData.builtinNames().RTCIceCandidatePrivateName(), JSRTCIceCandidate::getConstructor(vm, this), DontDelete | ReadOnly),
         JSDOMGlobalObject::GlobalPropertyInfo(clientData.builtinNames().RTCSessionDescriptionPrivateName(), JSRTCSessionDescription::getConstructor(vm, this), DontDelete | ReadOnly),
 #endif
@@ -111,7 +112,7 @@ void JSDOMGlobalObject::finishCreation(VM& vm, JSObject* thisValue)
 {
     Base::finishCreation(vm, thisValue);
     ASSERT(inherits(info()));
-
+    
     addBuiltinGlobals(vm);
 }
 

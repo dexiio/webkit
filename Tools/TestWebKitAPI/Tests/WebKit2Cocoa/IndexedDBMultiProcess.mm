@@ -30,6 +30,7 @@
 #import <WebKit/WebKit.h>
 #import <WebKit/WKProcessPoolPrivate.h>
 #import <WebKit/WKUserContentControllerPrivate.h>
+#import <WebKit/WKWebViewConfigurationPrivate.h>
 #import <WebKit/_WKProcessPoolConfiguration.h>
 #import <WebKit/_WKUserStyleSheet.h>
 #import <wtf/RetainPtr.h>
@@ -57,6 +58,10 @@ TEST(IndexedDB, IndexedDBMultiProcess)
     RetainPtr<IndexedDBMPMessageHandler> handler = adoptNS([[IndexedDBMPMessageHandler alloc] init]);
     RetainPtr<WKWebViewConfiguration> configuration = adoptNS([[WKWebViewConfiguration alloc] init]);
     [[configuration userContentController] addScriptMessageHandler:handler.get() name:@"testHandler"];
+
+    // Allow file URLs to load non-file resources
+    [configuration _setAllowUniversalAccessFromFileURLs:YES];
+
     [configuration.get().processPool _terminateDatabaseProcess];
 
     RetainPtr<WKWebView> webView = adoptNS([[WKWebView alloc] initWithFrame:NSMakeRect(0, 0, 800, 600) configuration:configuration.get()]);
@@ -72,6 +77,10 @@ TEST(IndexedDB, IndexedDBMultiProcess)
     receivedScriptMessage = false;
     RetainPtr<NSString> string2 = (NSString *)[lastScriptMessage body];
 
+    TestWebKitAPI::Util::run(&receivedScriptMessage);
+    receivedScriptMessage = false;
+    RetainPtr<NSString> string3 = (NSString *)[lastScriptMessage body];
+
     // Make a new web view with a new web process to finish the test
     RetainPtr<WKWebView> webView2 = adoptNS([[WKWebView alloc] initWithFrame:NSMakeRect(0, 0, 800, 600) configuration:configuration.get()]);
 
@@ -80,11 +89,12 @@ TEST(IndexedDB, IndexedDBMultiProcess)
 
     TestWebKitAPI::Util::run(&receivedScriptMessage);
     receivedScriptMessage = false;
-    RetainPtr<NSString> string3 = (NSString *)[lastScriptMessage body];
+    RetainPtr<NSString> string4 = (NSString *)[lastScriptMessage body];
 
     EXPECT_WK_STREQ(@"UpgradeNeeded", string1.get());
     EXPECT_WK_STREQ(@"Transaction complete", string2.get());
-    EXPECT_WK_STREQ(@"Value of foo: bar", string3.get());
+    EXPECT_WK_STREQ(@"Open success", string3.get());
+    EXPECT_WK_STREQ(@"Value of foo: bar", string4.get());
 }
 
 #endif

@@ -36,7 +36,7 @@ namespace WebCore {
 
 JSC::EncodedJSValue jsattributeReadonly(JSC::ExecState*, JSC::EncodedJSValue, JSC::PropertyName);
 JSC::EncodedJSValue jsattributeConstructor(JSC::ExecState*, JSC::EncodedJSValue, JSC::PropertyName);
-void setJSattributeConstructor(JSC::ExecState*, JSC::EncodedJSValue, JSC::EncodedJSValue);
+bool setJSattributeConstructor(JSC::ExecState*, JSC::EncodedJSValue, JSC::EncodedJSValue);
 
 class JSattributePrototype : public JSC::JSNonFinalObject {
 public:
@@ -87,7 +87,7 @@ template<> JSValue JSattributeConstructor::prototypeForStructure(JSC::VM& vm, co
 
 template<> void JSattributeConstructor::initializeProperties(VM& vm, JSDOMGlobalObject& globalObject)
 {
-    putDirect(vm, vm.propertyNames->prototype, JSattribute::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->prototype, JSattribute::prototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("attribute"))), ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
@@ -121,7 +121,7 @@ JSObject* JSattribute::createPrototype(VM& vm, JSGlobalObject* globalObject)
     return JSattributePrototype::create(vm, globalObject, JSattributePrototype::createStructure(vm, globalObject, globalObject->errorPrototype()));
 }
 
-JSObject* JSattribute::getPrototype(VM& vm, JSGlobalObject* globalObject)
+JSObject* JSattribute::prototype(VM& vm, JSGlobalObject* globalObject)
 {
     return getDOMPrototype<JSattribute>(vm, globalObject);
 }
@@ -164,16 +164,16 @@ EncodedJSValue jsattributeConstructor(ExecState* state, EncodedJSValue thisValue
     return JSValue::encode(JSattribute::getConstructor(state->vm(), domObject->globalObject()));
 }
 
-void setJSattributeConstructor(ExecState* state, EncodedJSValue thisValue, EncodedJSValue encodedValue)
+bool setJSattributeConstructor(ExecState* state, EncodedJSValue thisValue, EncodedJSValue encodedValue)
 {
     JSValue value = JSValue::decode(encodedValue);
     JSattributePrototype* domObject = jsDynamicCast<JSattributePrototype*>(JSValue::decode(thisValue));
     if (UNLIKELY(!domObject)) {
         throwVMTypeError(state);
-        return;
+        return false;
     }
     // Shadowing a built-in constructor
-    domObject->putDirect(state->vm(), state->propertyNames().constructor, value);
+    return domObject->putDirect(state->vm(), state->propertyNames().constructor, value);
 }
 
 JSValue JSattribute::getConstructor(VM& vm, const JSGlobalObject* globalObject)

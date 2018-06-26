@@ -172,7 +172,12 @@ private:
             changed |= setPrediction(SpecInt32);
             break;
         }
-            
+
+        case TryGetById: {
+            changed |= setPrediction(SpecBytecodeTop);
+            break;
+        }
+
         case ArrayPop:
         case ArrayPush:
         case RegExpExec:
@@ -209,7 +214,6 @@ private:
         case GetGetter:
         case GetSetter:
         case GetCallee:
-        case NewArrowFunction:
         case NewFunction:
         case NewGeneratorFunction: {
             changed |= setPrediction(SpecFunction);
@@ -238,10 +242,10 @@ private:
         }
 
         case UInt32ToNumber: {
-            // FIXME: Support Int52.
-            // https://bugs.webkit.org/show_bug.cgi?id=125704
             if (node->canSpeculateInt32(m_pass))
                 changed |= mergePrediction(SpecInt32);
+            else if (enableInt52())
+                changed |= mergePrediction(SpecMachineInt);
             else
                 changed |= mergePrediction(SpecBytecodeNumber);
             break;
@@ -389,7 +393,8 @@ private:
 
         case ArithRound:
         case ArithFloor:
-        case ArithCeil: {
+        case ArithCeil:
+        case ArithTrunc: {
             if (isInt32OrBooleanSpeculation(node->getHeapPrediction()) && m_graph.roundShouldSpeculateInt32(node, m_pass))
                 changed |= setPrediction(SpecInt32);
             else
@@ -483,7 +488,6 @@ private:
         }
             
         case GetButterfly:
-        case GetButterflyReadOnly:
         case GetIndexedPropertyStorage:
         case AllocatePropertyStorage:
         case ReallocatePropertyStorage: {
@@ -550,7 +554,8 @@ private:
             break;
         }
             
-        case SkipScope: {
+        case SkipScope:
+        case GetGlobalObject: {
             changed |= setPrediction(SpecObjectOther);
             break;
         }
@@ -640,7 +645,6 @@ private:
         case CheckTierUpInLoop:
         case CheckTierUpAtReturn:
         case CheckTierUpAndOSREnter:
-        case CheckTierUpWithNestedTriggerAndOSREnter:
         case InvalidationPoint:
         case CheckInBounds:
         case ValueToInt32:
@@ -665,7 +669,11 @@ private:
         case PutStack:
         case KillStack:
         case StoreBarrier:
-        case GetStack: {
+        case GetStack:
+        case GetRegExpObjectLastIndex:
+        case SetRegExpObjectLastIndex:
+        case RecordRegExpCachedResult:
+        case LazyJSConstant: {
             // This node should never be visible at this stage of compilation. It is
             // inserted by fixup(), which follows this phase.
             DFG_CRASH(m_graph, node, "Unexpected node during prediction propagation");
@@ -742,7 +750,6 @@ private:
         case DFG::Jump:
         case Branch:
         case Switch:
-        case Breakpoint:
         case ProfileWillCall:
         case ProfileDidCall:
         case ProfileType:
@@ -750,6 +757,7 @@ private:
         case ThrowReferenceError:
         case ForceOSRExit:
         case SetArgument:
+        case SetFunctionName:
         case CheckStructure:
         case CheckCell:
         case CheckNotEmpty:
@@ -761,6 +769,8 @@ private:
         case Check:
         case PutGlobalVariable:
         case CheckWatchdogTimer:
+        case LogShadowChickenPrologue:
+        case LogShadowChickenTail:
         case Unreachable:
         case LoopHint:
         case NotifyWrite:
@@ -1013,7 +1023,6 @@ private:
     
 bool performPredictionPropagation(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG Prediction Propagation Phase");
     return runPhase<PredictionPropagationPhase>(graph);
 }
 

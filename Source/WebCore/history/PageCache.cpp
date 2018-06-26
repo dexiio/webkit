@@ -46,6 +46,7 @@
 #include "Logging.h"
 #include "MainFrame.h"
 #include "MemoryPressureHandler.h"
+#include "NoEventDispatchAssertion.h"
 #include "Page.h"
 #include "Settings.h"
 #include "SubframeLoader.h"
@@ -194,7 +195,7 @@ static bool canCachePage(Page& page)
     DiagnosticLoggingClient& diagnosticLoggingClient = mainFrame.diagnosticLoggingClient();
     bool isCacheable = canCacheFrame(mainFrame, diagnosticLoggingClient, indentLevel + 1);
     
-    if (!page.settings().usesPageCache()) {
+    if (!page.settings().usesPageCache() || page.isResourceCachingDisabled()) {
         PCLOG("   -Page settings says b/f cache disabled");
         logPageCacheFailureDiagnosticMessage(diagnosticLoggingClient, DiagnosticLoggingKeys::isDisabledKey());
         isCacheable = false;
@@ -397,6 +398,11 @@ void PageCache::addIfCacheable(HistoryItem& item, Page* page)
     if (page->focusController().focusedFrame())
         page->focusController().setFocusedFrame(&page->mainFrame());
 
+    // Focus the main frame, defocusing a focused subframe (if we have one). We do this here,
+    // before the page enters the page cache, while we still can dispatch DOM blur/focus events.
+    if (page->focusController().focusedFrame())
+        page->focusController().setFocusedFrame(&page->mainFrame());
+
     // Fire the pagehide event in all frames.
     firePageHideEventRecursively(page->mainFrame());
 
@@ -430,7 +436,7 @@ std::unique_ptr<CachedPage> PageCache::take(HistoryItem& item, Page* page)
     m_items.remove(&item);
     std::unique_ptr<CachedPage> cachedPage = WTFMove(item.m_cachedPage);
 
-    if (cachedPage->hasExpired()) {
+    if (cachedPage->hasExpired() || (page && page->isResourceCachingDisabled())) {
         LOG(PageCache, "Not restoring page for %s from back/forward cache because cache entry has expired", item.url().string().ascii().data());
         logPageCacheFailureDiagnosticMessage(page, DiagnosticLoggingKeys::expiredKey());
         return nullptr;
@@ -448,7 +454,7 @@ CachedPage* PageCache::get(HistoryItem& item, Page* page)
         return nullptr;
     }
 
-    if (cachedPage->hasExpired()) {
+    if (cachedPage->hasExpired() || (page && page->isResourceCachingDisabled())) {
         LOG(PageCache, "Not restoring page for %s from back/forward cache because cache entry has expired", item.url().string().ascii().data());
         logPageCacheFailureDiagnosticMessage(page, DiagnosticLoggingKeys::expiredKey());
         remove(item);

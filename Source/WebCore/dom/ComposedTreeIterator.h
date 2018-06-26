@@ -36,7 +36,8 @@ class HTMLSlotElement;
 class ComposedTreeIterator {
 public:
     ComposedTreeIterator();
-    ComposedTreeIterator(ContainerNode& root);
+    enum FirstChildTag { FirstChild };
+    ComposedTreeIterator(ContainerNode& root, FirstChildTag);
     ComposedTreeIterator(ContainerNode& root, Node& current);
 
     Node& operator*() { return current(); }
@@ -67,16 +68,16 @@ private:
 #endif
 
     struct Context {
-        Context() { }
-        explicit Context(ContainerNode& root)
-            : iterator(root)
-        { }
-        Context(ContainerNode& root, Node& node, size_t slotNodeIndex = notFound)
-            : iterator(root, &node)
-            , slotNodeIndex(slotNodeIndex)
-        { }
+        Context();
+        Context(ContainerNode& root, FirstChildTag);
+        Context(ContainerNode& root, Node& node);
 
+#if ENABLE(SHADOW_DOM) || ENABLE(DETAILS_ELEMENT)
+        enum SlottedTag { Slotted };
+        Context(ContainerNode& root, Node& node, SlottedTag);
+#endif
         ElementAndTextDescendantIterator iterator;
+        ElementAndTextDescendantIterator end;
         size_t slotNodeIndex { notFound };
     };
     Context& context() { return m_contextStack.last(); }
@@ -84,7 +85,7 @@ private:
     Node& current() { return *context().iterator; }
 
     bool m_didDropAssertions { false };
-    Vector<Context, 4> m_contextStack;
+    Vector<Context, 8> m_contextStack;
 };
 
 inline ComposedTreeIterator::ComposedTreeIterator()
@@ -112,7 +113,7 @@ inline ComposedTreeIterator& ComposedTreeIterator::traverseNextSkippingChildren(
 {
     context().iterator.traverseNextSkippingChildren();
 
-    if (!context().iterator && m_contextStack.size() > 1)
+    if (context().iterator == context().end && m_contextStack.size() > 1)
         traverseNextLeavingContext();
     
     return *this;
@@ -156,7 +157,7 @@ public:
         : m_parent(parent)
     { }
 
-    ComposedTreeIterator begin() { return ComposedTreeIterator(m_parent); }
+    ComposedTreeIterator begin() { return ComposedTreeIterator(m_parent, ComposedTreeIterator::FirstChild); }
     ComposedTreeIterator end() { return { }; }
     ComposedTreeIterator at(const Node& child) { return ComposedTreeIterator(m_parent, const_cast<Node&>(child)); }
     
@@ -170,7 +171,7 @@ public:
     public:
         Iterator() = default;
         explicit Iterator(ContainerNode& root)
-            : ComposedTreeIterator(root)
+            : ComposedTreeIterator(root, ComposedTreeIterator::FirstChild)
         { }
         Iterator(ContainerNode& root, Node& current)
             : ComposedTreeIterator(root, current)
