@@ -62,7 +62,7 @@ if (WebKit_OUTPUT_NAME)
     set_target_properties(WebKit PROPERTIES OUTPUT_NAME ${WebKit_OUTPUT_NAME})
 endif ()
 
-WEBKIT_FRAMEWORK(WebKit)
+# WEBKIT_FRAMEWORK(WebKit)
 
 set(WebKit_PRIVATE_HEADERS_LOCATION Headers/${PROJECT_VERSION}/QtWebKit/private)
 
@@ -76,9 +76,9 @@ if (${PORT} STREQUAL "Qt")
         install(FILES $<TARGET_PDB_FILE:WebKit> DESTINATION "${BIN_INSTALL_DIR}" OPTIONAL)
     endif ()
 
-    if (NOT MSVC)
-        ADD_PREFIX_HEADER(WebKit "${WEBKIT_DIR}/qt/WebKitPrefix.h")
-    endif ()
+#     if (NOT MSVC)
+#       ADD_PREFIX_HEADER(WebKit "${WEBKIT_DIR}/qt/WebKitPrefix.h")
+#     endif ()
 
     if (MACOS_BUILD_FRAMEWORKS)
         set_target_properties(WebKit PROPERTIES
