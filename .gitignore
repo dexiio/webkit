@@ -1,3 +1,6 @@
+__cmake_systeminformation
+.idea
+*.iml
 *.mode*
 *.pbxuser
 *.perspective*

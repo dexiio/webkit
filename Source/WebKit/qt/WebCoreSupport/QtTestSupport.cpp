@@ -34,11 +34,6 @@
 #include "PageCache.h"
 #include <QFontDatabase>
 
-#if HAVE(FONTCONFIG)
-#include <QByteArray>
-#include <QDir>
-#include <fontconfig/fontconfig.h>
-#endif
 
 using namespace WebCore;
 
@@ -64,42 +59,7 @@ void QtTestSupport::clearMemoryCaches()
 
 void QtTestSupport::initializeTestFonts()
 {
-#if HAVE(FONTCONFIG)
-    static int numFonts = -1;
 
-    FcInit();
-
-    // Some test cases may add or remove application fonts (via @font-face).
-    // Make sure to re-initialize the font set if necessary.
-    FcFontSet* appFontSet = FcConfigGetFonts(0, FcSetApplication);
-    if (appFontSet && numFonts >= 0 && appFontSet->nfont == numFonts)
-        return;
-
-    QByteArray fontDir = getenv("WEBKIT_TESTFONTS");
-    if (fontDir.isEmpty() || !QDir(QString::fromLatin1(fontDir)).exists()) {
-        qFatal("\n\n"
-            "----------------------------------------------------------------------\n"
-            "WEBKIT_TESTFONTS environment variable is not set correctly.\n"
-            "This variable has to point to the directory containing the fonts\n"
-            "you can clone from https://github.com/carewolf/qtwebkit-testfonts.git\n"
-            "----------------------------------------------------------------------\n"
-            );
-    }
-
-    QByteArray configFile = fontDir + "/fonts.conf";
-    FcConfig* config = FcConfigCreate();
-    if (!FcConfigParseAndLoad(config, reinterpret_cast<const FcChar8*>(configFile.constData()), FcTrue))
-        qFatal("Couldn't load font configuration file");
-    if (!FcConfigAppFontAddDir(config, reinterpret_cast<const FcChar8*>(fontDir.data())))
-        qFatal("Couldn't add font dir!");
-    FcConfigSetCurrent(config);
-
-    appFontSet = FcConfigGetFonts(config, FcSetApplication);
-    numFonts = appFontSet->nfont;
-
-    WebCore::FontCache::singleton().invalidate();
-    QFontDatabase::removeAllApplicationFonts();
-#endif
 }
 
 void QtTestSupport::garbageCollectorCollect()
