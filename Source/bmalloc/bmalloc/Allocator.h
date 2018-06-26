@@ -44,6 +44,7 @@ public:
     void* tryAllocate(size_t);
     void* allocate(size_t);
     void* allocate(size_t alignment, size_t);
+    void* allocateXLarge(size_t size);
     void* reallocate(void*, size_t);
 
     void scavenge();

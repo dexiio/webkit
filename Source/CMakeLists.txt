@@ -22,11 +22,6 @@ if (USE_WOFF2)
     add_subdirectory(ThirdParty/woff2)
 endif ()
 
-if (USE_WOFF2)
-    add_subdirectory(ThirdParty/brotli)
-    add_subdirectory(ThirdParty/woff2)
-endif ()
-
 if (ENABLE_WEBCORE)
     add_subdirectory(WebCore)
 endif ()
