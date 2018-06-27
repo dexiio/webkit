@@ -279,16 +279,7 @@ String Parser<LexerType>::parseInner(const Identifier& calleeName, SourceParseMo
         }
     }
 
-    bool validEnding;
-    if (isArrowFunctionBodyExpression) {
-        ASSERT(m_lexer->isReparsingFunction());
-        // When we reparse and stack overflow, we're not guaranteed a valid ending. If we don't run out of stack space,
-        // then of course this will always be valid because we already parsed for syntax errors. But we must
-        // be cautious in case we run out of stack space.
-        validEnding = isEndOfArrowFunction(); 
-    } else
-        validEnding = consume(EOFTOK);
-
+    bool validEnding = consume(EOFTOK);
     if (!sourceElements || !validEnding) {
         if (hasError())
             parseError = m_errorMessage;
@@ -835,13 +826,8 @@ template <class TreeBuilder> TreeSourceElements Parser<LexerType>::parseArrowFun
     
     context.setEndOffset(expr, m_lastTokenEndPosition.offset);
 
-    failIfFalse(isEndOfArrowFunction(), "Expected a ';', ']', '}', ')', ',', line terminator or EOF following a arrow function statement");
-
     JSTextPosition end = tokenEndPosition();
     
-    if (!m_lexer->prevTerminator())
-        setEndOfStatement();
-
     TreeSourceElements sourceElements = context.createSourceElements();
     TreeStatement body = context.createReturnStatement(location, expr, start, end);
     context.setEndOffset(body, m_lastTokenEndPosition.offset);
@@ -2107,9 +2093,7 @@ template <class TreeBuilder> bool Parser<LexerType>::parseFunctionInfo(TreeBuild
     
     popScope(functionScope, TreeBuilder::NeedsFreeVariableInfo);
     
-    if (functionBodyType == ArrowFunctionBodyExpression)
-        failIfFalse(isEndOfArrowFunction(), "Expected the closing ';' ',' ']' ')' '}', line terminator or EOF after arrow function");
-    else {
+    if (functionBodyType != ArrowFunctionBodyExpression) {
         matchOrFail(CLOSEBRACE, "Expected a closing '}' after a ", stringForFunctionMode(mode), " body");
         next();
     }
